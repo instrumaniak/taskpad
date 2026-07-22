@@ -520,10 +520,11 @@ No stack traces, no debug output, no unexpected crashes.
 | CLI11 | `libcli11-dev` | 2.1.2 | Command-line argument parsing |
 | yaml-cpp | `libyaml-cpp-dev` | 0.7.0 | YAML read/write |
 | nlohmann/json | `nlohmann-json3-dev` | 3.10.5 | JSON support (optional, for future use) |
+| doctest | `doctest-dev` | 2.4.11 | Unit testing framework (header-only) |
 
 **Installation:**
 ```bash
-sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev
+sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev doctest-dev
 ```
 
 ### Build System
@@ -636,17 +637,11 @@ taskpad/
 
 ### Framework
 
-Use **doctest** (header-only, single file):
+Use **doctest** (installed via system package):
 
 ```cpp
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
-```
-
-**Installation:**
-```bash
-# Download single header
-wget https://raw.githubusercontent.com/doctest/doctest/v2.5.3/doctest/doctest.h -O tests/doctest.h
+#include <doctest/doctest.h>
 ```
 
 ### Test Organization
@@ -662,7 +657,7 @@ wget https://raw.githubusercontent.com/doctest/doctest/v2.5.3/doctest/doctest.h 
 
 ```cpp
 // test_models.cpp
-#include "doctest.h"
+#include <doctest/doctest.h>
 #include "models.h"
 
 TEST_CASE("Task ID formatting") {
@@ -699,7 +694,7 @@ TEST_CASE("Dependency validation") {
 make test
 
 # Or manually
-g++ -std=c++17 -Itests -Isrc tests/test_main.cpp tests/test_models.cpp src/models.cpp -o tests/test_models && ./tests/test_models
+g++ -std=c++17 -Isrc tests/test_main.cpp tests/test_models.cpp src/models.cpp -o tests/test_models && ./tests/test_models
 ```
 
 ### Test Coverage Requirements
@@ -752,7 +747,7 @@ export PATH="$HOME/.local/bin:$PATH"
 Install required system packages:
 
 ```bash
-sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev
+sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev doctest-dev
 ```
 
 ### Building from Source
@@ -763,7 +758,7 @@ git clone https://github.com/yourusername/taskpad.git
 cd taskpad
 
 # Install dependencies (if not already installed)
-sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev
+sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev doctest-dev
 
 # Build
 make
