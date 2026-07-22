@@ -13,6 +13,7 @@ taskpad is a lightweight, deterministic task management CLI tool designed for AI
 - **AI-agent friendly**: Structured output, predictable behavior, no crashes on edge cases.
 - **Deterministic**: Same inputs always produce same outputs. No randomness, no side effects.
 - **Zero privileges**: Installation requires no root/sudo access.
+- **Minimal config**: `.taskpad` stores only project-level settings (task directory path).
 
 ### Use Cases
 
@@ -29,6 +30,7 @@ taskpad is a lightweight, deterministic task management CLI tool designed for AI
 
 ```
 project-root/
+├── .taskpad                     # Project config (YAML, created by init)
 ├── specs/
 │   └── tasks/
 │       ├── status.yaml          # Single source of truth (all metadata)
@@ -37,6 +39,19 @@ project-root/
 │       └── ...
 └── ...
 ```
+
+### .taskpad Config File
+
+A minimal YAML config at the project root, created by `taskpad init`:
+
+```yaml
+# .taskpad — taskpad project config
+task-dir: specs/tasks    # Path to task files directory (default: specs/tasks)
+```
+
+- All commands read `task-dir` from `.taskpad` first, fall back to `specs/tasks`
+- Override with `--tasks-dir <path>` flag on any command
+- Minimal by design: only `task-dir` for now; future settings go here
 
 ### How CLI Interacts with Files
 
@@ -49,19 +64,22 @@ User/AI Agent
 │  (reads/writes)     │
 └─────────┬───────────┘
           │
-          ├──► status.yaml   (metadata: status, deps, phases)
+          ├──► .taskpad        (config: task-dir)
           │
-          └──► T*.md         (descriptions: goal, steps, criteria)
+          ├──► status.yaml    (metadata: status, deps, phases)
+          │
+          └──► T*.md          (descriptions: goal, steps, criteria)
 ```
 
 ### Data Flow
 
-1. `taskpad init` — Scans directory, creates `status.yaml` if not exists
-2. `taskpad new <name>` — Creates `T*.md` file + adds entry to `status.yaml`
-3. `taskpad do <id>` — Updates `status.yaml` (pending → in_progress)
-4. `taskpad done <id>` — Updates `status.yaml` (in_progress → done)
-5. `taskpad status` — Reads `status.yaml`, displays formatted table
-6. `taskpad next` — Reads `status.yaml`, finds next unblocked task
+1. `taskpad init` — Creates `.taskpad` config file
+2. `taskpad import` — Scans `task-dir` for existing T*.md files, creates `status.yaml`
+3. `taskpad new <name>` — Creates `T*.md` file + adds entry to `status.yaml`
+4. `taskpad do <id>` — Updates `status.yaml` (pending → in_progress)
+5. `taskpad done <id>` — Updates `status.yaml` (in_progress → done)
+6. `taskpad status` — Reads `status.yaml`, displays formatted table
+7. `taskpad next` — Reads `status.yaml`, finds next unblocked task
 
 ---
 
@@ -214,6 +232,20 @@ Set up project structure, Makefile, directory tree, .gitignore, and a stub main.
 
 ## 5. CLI Commands
 
+### Global Flags
+
+All commands that access tasks support these flags:
+
+| Flag | Description |
+|------|-------------|
+| `--tasks-dir <path>` | Override `task-dir` from `.taskpad` config |
+| `--help` | Show help for command |
+
+Task directory resolution order:
+1. `--tasks-dir` flag (if provided)
+2. `task-dir` from `.taskpad` config
+3. Fallback: `tasks/`
+
 ### taskpad init
 
 Initialize task tracking in the current project.
@@ -221,15 +253,43 @@ Initialize task tracking in the current project.
 ```bash
 $ taskpad init
 Initialized taskpad in specs/tasks/
-Created status.yaml
-Ready to add tasks with `taskpad new`
+Created .taskpad config
+Ready to add tasks with `taskpad new` or `taskpad import`
 ```
 
 **Behavior:**
-- Creates `specs/tasks/` directory if it doesn't exist
-- Creates empty `status.yaml` if it doesn't exist
-- If `status.yaml` already exists, reports "Already initialized"
-- Does NOT scan existing T*.md files (start fresh)
+- Creates `.taskpad` config file at project root
+- Default `task-dir`: `specs/tasks/`
+- If `.taskpad` already exists, reports "Already initialized"
+- Does NOT create `status.yaml` — use `taskpad new` or `taskpad import`
+
+### taskpad import
+
+Import existing task files into taskpad by creating `status.yaml` from T*.md files.
+
+```bash
+$ taskpad import
+Scanning specs/tasks/ for T*.md files...
+Found 30 task files
+Created status.yaml with 30 tasks
+
+# With --force to overwrite existing status.yaml
+$ taskpad import --force
+Found 30 task files
+Overwrote status.yaml with 30 tasks
+```
+
+**Behavior:**
+- Reads `task-dir` from `.taskpad` (or uses `--tasks-dir` override)
+- Scans directory for files matching `T[0-9]{3}-*.md`
+- For each file, parses:
+  - **Status**: from embedded `## Status: <value>` line (if present, else `pending`)
+  - **Dependencies**: from `## Depends On` section (T### references)
+- Creates `status.yaml` with all discovered tasks
+- Does NOT modify existing markdown files
+- Does NOT auto-parse `README.md` for phases/critical_path
+- Error if `status.yaml` already exists (use `--force` to overwrite)
+- Shows summary: task count, status distribution
 
 ### taskpad new <name>
 
@@ -249,6 +309,7 @@ Edit T001-project-setup.md to add:
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Generates next available task ID (T001, T002, ...)
 - Converts name to kebab-case for filename
 - Creates T*.md file from template
@@ -275,6 +336,7 @@ Progress: 1/30 done, 1 in_progress, 28 pending
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Reads `status.yaml`
 - Groups tasks by phase
 - Shows status in brackets: [pending], [in_progress], [done]
@@ -297,6 +359,7 @@ Next: T003 — Core Types
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Finds all tasks with status=pending
 - Filters to tasks where all dependencies are done
 - Prioritizes: critical path first → phase number → task number
@@ -317,6 +380,7 @@ Now reading T003-core-types.md...
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Validates task ID exists
 - Checks all dependencies are done (warns if not)
 - Updates `status.yaml`: status = in_progress
@@ -340,6 +404,7 @@ Unblocked tasks:
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Validates task ID exists
 - Updates `status.yaml`: status = done
 - Scans for tasks whose dependencies are now all done
@@ -357,6 +422,7 @@ Status changed: in_progress → pending
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Validates task ID exists
 - Updates `status.yaml`: status = pending
 - If task is already pending, reports "Already pending"
@@ -377,6 +443,7 @@ Tasks waiting on T012:
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Shows what the task depends on (with status)
 - Shows what depends on this task
 - Marks satisfied dependencies with ✓
@@ -392,6 +459,7 @@ Logged to T003-core-types.md
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Validates task ID exists
 - Appends timestamped entry to `## Notes` section in T*.md
 - Format: `- [YYYY-MM-DD HH:MM] <message>`
@@ -416,6 +484,7 @@ Updated T003 depends: T001, T002
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Validates task ID exists
 - Updates specified fields in `status.yaml`
 - Supports: --status, --phase, --critical, --depends, --files, --specs
@@ -448,6 +517,7 @@ Critical Path: T001 → T003 → T010 → T011 → T012 → T016 → T024
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Reads `status.yaml`
 - Calculates percentages
 - Groups by phase
@@ -464,6 +534,7 @@ Updated status.yaml
 ```
 
 **Behavior:**
+- Reads `task-dir` from `.taskpad` config
 - Validates task ID exists
 - Removes entry from `status.yaml`
 - Optionally removes T*.md file (asks for confirmation)
@@ -493,13 +564,17 @@ No stack traces, no debug output, no unexpected crashes.
 | Task already done | `error: Task T003 already completed` |
 | Dependencies not met | `warning: Task T003 depends on T002 (pending). Proceed anyway? [y/N]` |
 | Circular dependency | `error: Circular dependency detected: T003 → T005 → T003` |
-| status.yaml missing | `error: Not initialized. Run 'taskpad init' first` |
+| .taskpad missing | `error: Not initialized. Run 'taskpad init' first` |
+| status.yaml missing | `error: No status.yaml found. Run 'taskpad import' or 'taskpad new' first` |
 | status.yaml malformed | `error: Invalid status.yaml format. Expected YAML mapping` |
 | T*.md missing | `warning: Task file T003-core-types.md not found. Creating template.` |
 | No tasks available | `info: All tasks blocked or complete` |
 | Directory not writable | `error: Cannot write to specs/tasks/. Check permissions.` |
 | Empty task name | `error: Task name cannot be empty` |
 | Duplicate task name | `warning: Task with similar name exists: T005-layout-system.md` |
+| .taskpad already exists | `error: Already initialized. Remove .taskpad to re-initialize.` |
+| status.yaml already exists (import) | `error: status.yaml already exists. Use --force to overwrite.` |
+| Invalid task-dir path | `error: Task directory 'xyz' not found. Check task-dir in .taskpad` |
 
 ### Validation Rules
 
@@ -784,15 +859,17 @@ Current version: `1.0.0`
 
 ## Appendix A: Example Workflow
 
-### 1. Initialize Project
+### Fresh Project (no existing tasks)
+
+#### 1. Initialize Project
 
 ```bash
 cd /path/to/my-project
 taskpad init
-# Created specs/tasks/status.yaml
+# Created .taskpad config
 ```
 
-### 2. Create Tasks
+#### 2. Create Tasks
 
 ```bash
 taskpad new "Project Setup"
@@ -800,14 +877,14 @@ taskpad new "Core Types"
 taskpad new "Resource Manager"
 ```
 
-### 3. Edit Task Files
+#### 3. Edit Task Files
 
 ```bash
 vim specs/tasks/T001-project-setup.md
 # Add goal, steps, acceptance criteria
 ```
 
-### 4. Start Working
+#### 4. Start Working
 
 ```bash
 taskpad next
@@ -817,7 +894,7 @@ taskpad do T001
 # Status: pending → in_progress
 ```
 
-### 5. Complete Task
+#### 5. Complete Task
 
 ```bash
 taskpad done T001
@@ -825,11 +902,30 @@ taskpad done T001
 # Shows unblocked tasks
 ```
 
-### 6. Check Progress
+#### 6. Check Progress
 
 ```bash
 taskpad status
 taskpad summary
+```
+
+### Existing Project (with T*.md files)
+
+#### 1. Initialize and Import
+
+```bash
+cd /path/to/existing-project
+taskpad init
+taskpad import
+# Scanned 30 T*.md files, created status.yaml
+```
+
+#### 2. Use as Normal
+
+```bash
+taskpad next
+taskpad do T003
+taskpad done T003
 ```
 
 ---
@@ -858,6 +954,7 @@ description: Manage tasks using taskpad CLI. Use when user says /task, wants to 
 - `/task deps TXXX` → Run `taskpad deps TXXX`
 - `/task new "Name"` → Run `taskpad new "Name"`
 - `/task summary` → Run `taskpad summary`
+- `/task import` → Run `taskpad import`
 
 ## Workflow
 
@@ -881,7 +978,14 @@ description: Manage tasks using taskpad CLI. Use when user says /task, wants to 
 
 ## Appendix D: YAML Schema Validation
 
-The `status.yaml` file must conform to this structure:
+### .taskpad Config Schema
+
+```yaml
+# Required keys
+task-dir: string    # Path to task files directory (e.g., "specs/tasks")
+```
+
+### status.yaml Schema
 
 ```yaml
 # Required keys
