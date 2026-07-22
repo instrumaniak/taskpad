@@ -657,7 +657,55 @@ No stack traces, no debug output, no unexpected crashes.
 
 ---
 
-## 7. Implementation Details
+## 7. Coding Style
+
+Conventions — a JS/TS-friendly C++ style.
+
+### Naming Conventions
+
+| Construct | Convention | Example |
+|-----------|-----------|---------|
+| Files/dirs | `snake_case` | `storage.cpp`, `tests/data/` |
+| Functions/methods | `camelCase` | `findNextTask()`, `toKebabCase()` |
+| Classes/structs | `PascalCase` | `Task`, `ProjectConfig` |
+| Enum types | `PascalCase` | `enum class Status` |
+| Enum values | `PascalCase` | `Status::InProgress` |
+| Variables/params | `camelCase` | `taskId`, `status` |
+| Private members | `_camelCase` | `_tasks`, `_phases` |
+| Boolean vars | `is`/`has`/`can` prefix | `isDone`, `hasCircularDep` |
+| Macros | `SCREAMING_SNAKE` | `DEBUG` |
+
+### Formatting
+
+- 2-space indent, K&R braces (opening `{` on same line)
+- 100-char soft line limit
+- `#pragma once` (not `#ifndef`)
+- Include order: own header → project headers → stdlib → vendor
+
+### Error Handling
+
+- No exceptions. Use `Result<T>` struct with `ok` bool + `error` string.
+- Use `std::optional<T>` for nullable return values.
+- All errors printed as `error: <message>` to stderr.
+
+### Namespace
+
+- Everything in `namespace taskpad { }`
+- No `using namespace` in headers
+
+### Anti-patterns
+
+| Forbidden | Use instead |
+|-----------|------------|
+| `throw`/`catch` | `Result<T>` |
+| `new`/`delete` | stack allocation or `std::unique_ptr` |
+| `using namespace std;` | `std::` prefix |
+| `#define` (non-macro) | `constexpr` |
+| C-style arrays | `std::array` or `std::vector` |
+
+---
+
+## 8. Implementation Details
 
 ### Libraries
 
@@ -786,7 +834,7 @@ taskpad/
 
 ---
 
-## 8. Testing
+## 9. Testing
 
 ### Framework
 
@@ -858,7 +906,7 @@ g++ -std=c++17 -Isrc tests/test_main.cpp tests/test_models.cpp src/models.cpp -o
 
 ---
 
-## 9. Distribution
+## 10. Distribution
 
 ### Installation
 
@@ -935,7 +983,7 @@ Current version: `1.0.0`
 
 ---
 
-## 10. AI Agent Skill System
+## 11. AI Agent Skill System
 
 ### Purpose
 
@@ -1010,7 +1058,7 @@ The skill enables this full workflow for AI agents:
 
 ---
 
-## Appendix A: Example Workflow
+## Appendix B: Example Workflow
 
 ### Fresh Project (no existing tasks)
 
@@ -1083,9 +1131,9 @@ taskpad done T003
 
 ---
 
-## Appendix B: AI Agent Skill
+## Appendix C: AI Agent Skill
 
-The AI agent skill file is shipped with taskpad and installed via `taskpad install-skills` (see [Section 10](#10-ai-agent-skill-system)).
+The AI agent skill file is shipped with taskpad and installed via `taskpad install-skills` (see [Section 11](#11-ai-agent-skill-system)).
 
 ### Shipped File
 
@@ -1129,11 +1177,11 @@ taskpad install-skills
 taskpad install-skills --project
 ```
 
-See [Section 10](#10-ai-agent-skill-system) for full details on the skill system.
+See [Section 11](#11-ai-agent-skill-system) for full details on the skill system.
 
 ---
 
-## Appendix C: File Naming Conventions
+## Appendix D: File Naming Conventions
 
 - Task files: `TXXX-kebab-case-name.md`
   - Examples: `T001-project-setup.md`, `T015-level-config.md`
@@ -1143,7 +1191,7 @@ See [Section 10](#10-ai-agent-skill-system) for full details on the skill system
 
 ---
 
-## Appendix D: YAML Schema Validation
+## Appendix E: YAML Schema Validation
 
 ### .taskpad Config Schema
 
