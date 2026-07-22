@@ -585,6 +585,29 @@ Updated status.yaml
 - Prompts to also remove T*.md file (use `--force` to skip and keep the file)
 - Warns if other tasks depend on this task
 
+### taskpad install-skills
+
+Install the taskpad AI agent skill file for agent discovery.
+
+```bash
+# Install globally (AI agent searches ~/.agents/skills/)
+$ taskpad install-skills
+Installed skill to ~/.agents/skills/taskpad/SKILL.md
+
+# Install for current project
+$ taskpad install-skills --project
+Installed skill to .agents/skills/taskpad/SKILL.md
+```
+
+**Behavior:**
+- Copies the taskpad skill files (SKILL.md) from the taskpad data directory to the target skill location
+- Global install: `~/.agents/skills/taskpad/` — available to all projects
+- Project install (--project): `.agents/skills/taskpad/` — scoped to current project
+- Skill files are bundled with the taskpad binary during `make install`
+- Reports success with the install path
+- If skill already exists, reports "Already installed. Use --force to overwrite"
+- With `--force`, overwrites existing skill files
+
 ---
 
 ## 6. Error Handling
@@ -689,15 +712,22 @@ debug: clean all
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 
-install: $(TARGET)
-	install -d $(HOME)/.local/bin
-	install -m 755 $(TARGET) $(HOME)/.local/bin/
+install: install-bin install-skills-data
+
+install-bin: $(TARGET)
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(TARGET) $(DESTDIR)$(PREFIX)/bin/
+
+install-skills-data:
+	install -d $(DESTDIR)$(PREFIX)/share/taskpad/skills
+	cp -r .agents/skills/taskpad $(DESTDIR)$(PREFIX)/share/taskpad/skills/
 
 test: $(TARGET)
 	./tests/run_tests.sh
 
 uninstall:
 	rm -f $(HOME)/.local/bin/$(TARGET)
+	rm -rf $(HOME)/.local/share/taskpad
 ```
 
 ### Code Structure
@@ -877,7 +907,7 @@ sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev doctest-dev
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/taskpad.git
+git clone https://github.com/instrumaniak/taskpad.git
 cd taskpad
 
 # Install dependencies (if not already installed)
@@ -902,6 +932,81 @@ Follow semantic versioning: `MAJOR.MINOR.PATCH`
 - PATCH: Bug fixes
 
 Current version: `1.0.0`
+
+---
+
+## 10. AI Agent Skill System
+
+### Purpose
+
+taskpad ships with an AI agent skill that teaches agents how to use the CLI. The skill replaces any file-based task management approach (e.g., manually reading/writing `## Status:` in Markdown files). All task operations go through the `taskpad` CLI.
+
+### Skill File Location
+
+The skill follows the vendor-neutral agent skill convention, discoverable by OpenCode, Claude Code, and other AI agents:
+
+| Scope | Path |
+|-------|------|
+| Project | `.agents/skills/taskpad/SKILL.md` |
+| Global | `~/.agents/skills/taskpad/SKILL.md` |
+
+### Shipped Files
+
+The taskpad repository contains the skill at `.agents/skills/taskpad/SKILL.md`. These files are bundled with the binary during `make install` and placed at `$(PREFIX)/share/taskpad/skills/`.
+
+### Installation
+
+Use the `taskpad install-skills` command (see [Section 5](#taskpad-install-skills)):
+
+```bash
+taskpad install-skills           # → ~/.agents/skills/taskpad/
+taskpad install-skills --project # → .agents/skills/taskpad/
+```
+
+Or manually copy from the repo:
+
+```bash
+cp -r .agents/skills/taskpad ~/.agents/skills/
+```
+
+### Skill Discovery
+
+AI agents discover skills automatically from these directories. When a user says `/taskpad status` or asks about task progress, the agent's skill system matches the `description` field and loads `SKILL.md`, which instructs the agent to run `taskpad` CLI commands instead of manipulating files directly.
+
+### Skill Contents
+
+The `SKILL.md` file contains:
+
+- **Frontmatter**: name (`taskpad`), description (trigger conditions), license, compatibility
+- **Setup instructions**: `taskpad init`, `import`, configuring phases and critical path
+- **Command reference**: All `/taskpad` commands with expected output and interpretation
+- **Daily workflow**: next → do → done → log cycle
+- **Progress tracking**: status, summary, deps commands
+- **Error recovery**: What to do when commands fail
+- **Notes**: Status is in `status.yaml` only, not in Markdown files
+
+### AI-Assisted Development Workflow
+
+The skill enables this full workflow for AI agents:
+
+```
+# One-time project setup
+/taskpad init
+/taskpad import
+/taskpad edit --phases "..."
+/taskpad edit --critical-path "..."
+
+# Daily development cycle
+/taskpad next         → agent reads the task file and referenced specs
+/taskpad do TXXX      → agent implements the code
+/taskpad log TXXX     → agent records progress
+/taskpad done TXXX    → agent marks complete
+
+# Progress checks
+/taskpad status
+/taskpad summary
+/taskpad deps TXXX
+```
 
 ---
 
@@ -978,39 +1083,53 @@ taskpad done T003
 
 ---
 
-## Appendix B: AI Agent Integration
+## Appendix B: AI Agent Skill
 
-### Skill File Pattern
+The AI agent skill file is shipped with taskpad and installed via `taskpad install-skills` (see [Section 10](#10-ai-agent-skill-system)).
 
-The AI agent uses a skill file to know how to interact with taskpad:
+### Shipped File
 
-```markdown
----
-name: taskpad
-description: Manage tasks using taskpad CLI. Use when user says /task, wants to check status, start/complete tasks, or see next task.
----
+The skill file lives at `.agents/skills/taskpad/SKILL.md` in the taskpad repository and contains:
 
-# Taskpad Integration
+- **Frontmatter**: name, description, license, compatibility metadata
+- **Setup instructions**: init, import, configure phases/critical path
+- **Command reference**: All `/taskpad` commands with output examples and interpretation
+- **Daily workflow**: next → do → done → log cycle
+- **Progress tracking**: status, summary, deps
+- **Error recovery table**: What to do for every error case
 
-## Commands
+### Command Prefix
 
-- `/task status` → Run `taskpad status`
-- `/task next` → Run `taskpad next`
-- `/task do TXXX` → Run `taskpad do TXXX`
-- `/task done TXXX` → Run `taskpad done TXXX`
-- `/task pause TXXX` → Run `taskpad pause TXXX`
-- `/task deps TXXX` → Run `taskpad deps TXXX`
-- `/task new "Name"` → Run `taskpad new "Name"`
-- `/task summary` → Run `taskpad summary`
-- `/task import` → Run `taskpad import`
+All skill commands use the `/taskpad` prefix to avoid confusion with other tools:
 
-## Workflow
-
-1. When user asks "what should I work on?", run `taskpad next`
-2. When starting work, run `taskpad do TXXX`
-3. When work is complete, run `taskpad done TXXX`
-4. When user asks about progress, run `taskpad status` or `taskpad summary`
 ```
+/taskpad status       → taskpad status
+/taskpad next         → taskpad next
+/taskpad do TXXX      → taskpad do TXXX
+/taskpad done TXXX    → taskpad done TXXX
+/taskpad pause TXXX   → taskpad pause TXXX
+/taskpad deps TXXX    → taskpad deps TXXX
+/taskpad new "Name"   → taskpad new "Name"
+/taskpad summary      → taskpad summary
+/taskpad import       → taskpad import
+/taskpad init         → taskpad init
+/taskpad log TXXX ... → taskpad log TXXX ...
+/taskpad edit TXXX ... → taskpad edit TXXX ...
+/taskpad remove TXXX  → taskpad remove TXXX
+/taskpad install-skills → taskpad install-skills
+```
+
+### Install
+
+```bash
+# Global (all projects)
+taskpad install-skills
+
+# Project-specific
+taskpad install-skills --project
+```
+
+See [Section 10](#10-ai-agent-skill-system) for full details on the skill system.
 
 ---
 
