@@ -32,6 +32,8 @@ taskpad edit --critical-path "T001,T003,T010,T011,T012,T016,T024"
 
 All commands use the `/taskpad` prefix:
 
+**Global flag:** `--tasks-dir <path>` overrides the task directory from `.taskpad` config. Resolution order: (1) `--tasks-dir` flag, (2) `.taskpad` config's `task-dir` key, (3) fallback `specs/tasks/`.
+
 ### `/taskpad status`
 Show all tasks grouped by phase with status.
 
@@ -78,7 +80,7 @@ Now reading T003-core-types.md...
 ```
 
 - Reads the task file and displays goal + first implementation step
-- If dependencies are not met, shows a warning. Use `taskpad do T003 --force` to skip the check
+- If dependencies are not met, blocks with an error listing the unmet dependencies. Use `taskpad do T003 --force` to override
 - If already in_progress, reports "Already in_progress"
 - If already done, reports "Already done"
 
@@ -166,6 +168,8 @@ Edit task or project metadata.
 ```
 > taskpad edit T003 --phase 2
 > taskpad edit T003 --depends T001,T002
+> taskpad edit T003 --files "src/foo.cpp,include/foo.h"
+> taskpad edit T003 --specs "specs/ARCH.md,specs/API.md"
 > taskpad edit --phases "0:Scaffolding,1:Foundation"
 > taskpad edit --critical-path "T001,T003,T010"
 ```
@@ -182,7 +186,7 @@ Removed T030 — Final Polish
 Updated status.yaml
 ```
 
-Prompts about deleting the task file. Use `taskpad remove T030 --force` to skip the prompt.
+Without `--force`, prints a hint about also removing the .md file. Use `--force` to suppress the hint (does not delete the file).
 
 ### `/taskpad import`
 Import existing T*.md files into taskpad.
@@ -230,10 +234,11 @@ Install this skill file for AI agent discovery.
 | `Task not found` | Check task ID with `taskpad status` |
 | `Already in_progress` / `Already done` | Use `taskpad pause` to revert, or proceed |
 | `Unmet dependencies` | Use `taskpad do TXXX --force` to override |
-| `Circular dependency` | Fix depends in the task file or via `taskpad edit` |
+| `Circular dependency` | Fix depends via `taskpad edit TXXX --depends TYYY,TZZZ` |
 | `status.yaml already exists` | Use `taskpad import --force` |
 | `Invalid task ID` | Use format TXXX (T001, T002, etc.) |
 | `tasks-dir not found` | Check `.taskpad` config or use `--tasks-dir <path>` |
+| `Skill files not found` | Ensure SKILL.md exists at `.agents/skills/taskpad/` or the install path |
 
 ## Notes
 
