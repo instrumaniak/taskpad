@@ -1,26 +1,34 @@
 tasks:
   T001:
-    name: Enhance import to extract phase specs and files
+    name: Enhance Import To Extract Phase Specs And Files
     status: pending
     depends: ~
-    phase: 1
+    phase: 0
     critical: false
     files: ~
     specs: ~
   T002:
-    name: Prepare cardgame repo for taskpad management
+    name: Prepare Cardgame Repo For Taskpad Management
     status: pending
     depends:
       - T001
-    phase: 1
+    phase: 0
     critical: false
     files: ~
     specs: ~
   T003:
-    name: Code review fixes for this session
+    name: Code Review Fixes For This Session
     status: done
     depends: ~
     phase: 0
     critical: true
+    files: ~
+    specs: ~
+  T004:
+    name: Fix Remove Cli Flag
+    status: done
+    depends: ~
+    phase: 0
+    critical: false
     files: ~
     specs: ~

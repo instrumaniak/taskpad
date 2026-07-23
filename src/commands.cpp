@@ -1124,7 +1124,7 @@ Result<void> Commands::summary(const std::string& tasksDir) {
 }
 
 Result<void> Commands::remove(const std::string& tasksDir,
-    const std::string& taskId, bool force) {
+    const std::string& taskId, bool removeAll, bool force) {
   if (!isValidTaskId(taskId)) {
     return Result<void>::failure(
         "Invalid task ID format. Expected TXXX (see Task ID Format)");
@@ -1141,6 +1141,9 @@ Result<void> Commands::remove(const std::string& tasksDir,
   if (taskIt == sf.tasks.end()) {
     return Result<void>::failure("Task " + taskId + " not found");
   }
+
+  std::string taskName = taskIt->second.name;
+  std::string taskFile = taskId + "-" + toKebabCase(taskName) + ".md";
 
   // Check for dependents
   std::vector<std::string> dependents;
@@ -1161,7 +1164,23 @@ Result<void> Commands::remove(const std::string& tasksDir,
     std::cerr << std::endl;
   }
 
-  std::string taskName = taskIt->second.name;
+  if (!force) {
+    std::string prompt;
+    if (removeAll) {
+      prompt = "Are you sure you want to remove " + taskId
+               + " and delete " + taskFile + "? [y/N] ";
+    } else {
+      prompt = "Are you sure you want to remove " + taskId
+               + " from status.yaml? [y/N] ";
+    }
+    std::cout << prompt;
+    std::string response;
+    std::getline(std::cin, response);
+    if (response.empty() || (response[0] != 'y' && response[0] != 'Y')) {
+      return Result<void>::success();
+    }
+  }
+
   sf.tasks.erase(taskIt);
 
   // Also remove from critical path if present
@@ -1174,9 +1193,11 @@ Result<void> Commands::remove(const std::string& tasksDir,
   std::cout << "Removed " << taskId << " \u2014 " << taskName << std::endl;
   std::cout << "Updated status.yaml" << std::endl;
 
-  if (!force) {
-    std::cout << "To also remove " << taskId << "-" << toKebabCase(taskName)
-              << ".md, use --force" << std::endl;
+  if (removeAll) {
+    if (fileExists(dir + "/" + taskFile)) {
+      std::filesystem::remove(dir + "/" + taskFile);
+      std::cout << "Deleted " << taskFile << std::endl;
+    }
   }
 
   return Result<void>::success();

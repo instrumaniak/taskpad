@@ -57,6 +57,7 @@ struct Commands {
 
   static Result<void> remove(const std::string& tasksDir,
       const std::string& taskId,
+      bool removeAll,
       bool force);
 
   static Result<void> installSkills(bool project);

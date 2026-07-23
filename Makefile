@@ -50,7 +50,7 @@ test: $(TEST_TARGET)
 	./$(TEST_TARGET)
 
 e2e-test: $(TARGET)
-	node --test tests/e2e/
+	node --test "tests/e2e/*.mjs"
 
 check: test e2e-test
 

@@ -222,11 +222,14 @@ for (const std::string& p : parts) {
   CLI::App* removeCmd = app.add_subcommand("remove", "Remove a task");
   std::string removeId;
   removeCmd->add_option("id", removeId, "Task ID (e.g. T001)")->required();
+  bool removeAll = false;
+  removeCmd->add_flag("--all", removeAll,
+      "Also delete the task markdown file");
   bool removeForce = false;
   removeCmd->add_flag("--force", removeForce,
-      "Skip file deletion prompt");
+      "Skip confirmation prompt");
   removeCmd->callback([&]() {
-    Result<void> r = Commands::remove(tasksDir, removeId, removeForce);
+    Result<void> r = Commands::remove(tasksDir, removeId, removeAll, removeForce);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
