@@ -4,6 +4,7 @@
 #include "models.h"
 
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <sys/stat.h>
@@ -15,18 +16,13 @@ static std::string testDir() {
 }
 
 static void createDir(const std::string& path) {
-  std::string cmd = "mkdir -p " + path;
-  static_cast<void>(system(cmd.c_str()));
+  std::error_code ec;
+  std::filesystem::create_directories(path, ec);
 }
 
 static void removeDir(const std::string& path) {
-  std::string cmd = "rm -rf " + path;
-  static_cast<void>(system(cmd.c_str()));
-}
-
-static void writeFile(const std::string& path, const std::string& content) {
-  std::ofstream f(path);
-  f << content;
+  std::error_code ec;
+  std::filesystem::remove_all(path, ec);
 }
 
 TEST_CASE("createConfig and check existence") {
@@ -37,18 +33,18 @@ TEST_CASE("createConfig and check existence") {
   CHECK(configExists(tmpDir) == false);
 
   // Create config
-  auto r = createConfig(tmpDir, "my-tasks");
+  Result<void> r = createConfig(tmpDir, "my-tasks");
   CHECK(r.hasError() == false);
 
   // Should exist now
   CHECK(configExists(tmpDir) == true);
 
   // Re-creating should fail
-  auto r2 = createConfig(tmpDir, "other");
+  Result<void> r2 = createConfig(tmpDir, "other");
   CHECK(r2.hasError() == true);
 
   // Read back
-  auto dirResult = readTaskDir(tmpDir);
+  Result<std::string> dirResult = readTaskDir(tmpDir);
   CHECK(dirResult.hasError() == false);
   CHECK(dirResult.value == "my-tasks");
 
@@ -59,7 +55,7 @@ TEST_CASE("readStatusFile - file not found") {
   std::string tmpDir = testDir() + "/test_nonexistent";
   createDir(tmpDir);
 
-  auto r = readStatusFile(tmpDir);
+  Result<StatusFile> r = readStatusFile(tmpDir);
   CHECK(r.hasError() == true);
   CHECK(r.errorMessage().find("No status.yaml found") != std::string::npos);
 
@@ -96,11 +92,11 @@ TEST_CASE("readStatusFile and writeStatusFile roundtrip") {
   sf.config.criticalPath = {"T002"};
 
   // Write
-  auto writeResult = writeStatusFile(tmpDir, sf);
+  Result<void> writeResult = writeStatusFile(tmpDir, sf);
   CHECK(writeResult.hasError() == false);
 
   // Read back
-  auto readResult = readStatusFile(tmpDir);
+  Result<StatusFile> readResult = readStatusFile(tmpDir);
   CHECK(readResult.hasError() == false);
 
   StatusFile loaded = readResult.value;
@@ -146,10 +142,10 @@ TEST_CASE("writeTaskFile and readTaskFile") {
   createDir(tmpDir);
 
   std::string path = taskFilePath(tmpDir, "T001", "Test Task");
-  auto writeResult = writeTaskFile(path, "T001", "Test Task");
+  Result<void> writeResult = writeTaskFile(path, "T001", "Test Task");
   CHECK(writeResult.hasError() == false);
 
-  auto readResult = readTaskFile(path);
+  Result<std::string> readResult = readTaskFile(path);
   CHECK(readResult.hasError() == false);
   CHECK(readResult.value.find("# T001: Test Task") != std::string::npos);
   CHECK(readResult.value.find("## Goal") != std::string::npos);
@@ -162,13 +158,13 @@ TEST_CASE("appendLog creates Notes section") {
   createDir(tmpDir);
 
   std::string path = taskFilePath(tmpDir, "T001", "Log Test");
-  auto writeResult = writeTaskFile(path, "T001", "Log Test");
+  Result<void> writeResult = writeTaskFile(path, "T001", "Log Test");
   CHECK(writeResult.hasError() == false);
 
-  auto logResult = appendLog(path, "Test message");
+  Result<void> logResult = appendLog(path, "Test message");
   CHECK(logResult.hasError() == false);
 
-  auto content = readTaskFile(path);
+  Result<std::string> content = readTaskFile(path);
   CHECK(content.hasError() == false);
   CHECK(content.value.find("## Notes") != std::string::npos);
   CHECK(content.value.find("Test message") != std::string::npos);

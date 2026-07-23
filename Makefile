@@ -3,6 +3,8 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -Isrc
 DEBUG_FLAGS = -g -O0 -DDEBUG
 LDFLAGS = -lyaml-cpp
 
+PREFIX ?= $(HOME)/.local
+
 SRCDIR = src
 BUILDDIR = build
 TARGET = taskpad
@@ -63,3 +65,4 @@ install-skills-data:
 uninstall:
 	rm -f $(HOME)/.local/bin/$(TARGET)
 	rm -rf $(HOME)/.local/share/taskpad
+	rm -rf $(HOME)/.agents/skills/taskpad

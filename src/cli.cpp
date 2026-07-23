@@ -18,9 +18,9 @@ int runCLI(int argc, char** argv) {
   int exitCode = 0;
 
   // ---- init ----
-  auto* initCmd = app.add_subcommand("init", "Initialize task tracking");
+  CLI::App* initCmd = app.add_subcommand("init", "Initialize task tracking");
   initCmd->callback([&]() {
-    auto r = Commands::init(tasksDir);
+    Result<void> r = Commands::init(tasksDir);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -28,13 +28,13 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- import ----
-  auto* importCmd = app.add_subcommand("import",
+  CLI::App* importCmd = app.add_subcommand("import",
       "Import existing task files into taskpad");
   bool importForce = false;
   importCmd->add_flag("--force", importForce,
       "Overwrite existing status.yaml");
   importCmd->callback([&]() {
-    auto r = Commands::import_(tasksDir, importForce);
+    Result<void> r = Commands::import_(tasksDir, importForce);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -42,7 +42,7 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- new ----
-  auto* newCmd = app.add_subcommand("new", "Create a new task");
+  CLI::App* newCmd = app.add_subcommand("new", "Create a new task");
   std::string newName;
   newCmd->add_option("name", newName, "Task name")->required();
   std::vector<std::string> newDepends;
@@ -54,7 +54,7 @@ int runCLI(int argc, char** argv) {
   bool newCritical = false;
   newCmd->add_flag("--critical", newCritical, "Mark as critical path");
   newCmd->callback([&]() {
-    auto r = Commands::new_(tasksDir, newName, newDepends, newPhase, newCritical);
+    Result<void> r = Commands::new_(tasksDir, newName, newDepends, newPhase, newCritical);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -62,10 +62,10 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- status ----
-  auto* statusCmd = app.add_subcommand("status",
+  CLI::App* statusCmd = app.add_subcommand("status",
       "Show all tasks with their status");
   statusCmd->callback([&]() {
-    auto r = Commands::status(tasksDir);
+    Result<void> r = Commands::status(tasksDir);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -73,10 +73,10 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- next ----
-  auto* nextCmd = app.add_subcommand("next",
+  CLI::App* nextCmd = app.add_subcommand("next",
       "Show the next task to work on");
   nextCmd->callback([&]() {
-    auto r = Commands::next(tasksDir);
+    Result<void> r = Commands::next(tasksDir);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -84,14 +84,14 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- do ----
-  auto* doCmd = app.add_subcommand("do", "Start working on a task");
+  CLI::App* doCmd = app.add_subcommand("do", "Start working on a task");
   std::string doId;
   doCmd->add_option("id", doId, "Task ID (e.g. T001)")->required();
   bool doForce = false;
   doCmd->add_flag("--force", doForce,
       "Skip dependency check");
   doCmd->callback([&]() {
-    auto r = Commands::do_(tasksDir, doId, doForce);
+    Result<void> r = Commands::do_(tasksDir, doId, doForce);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -99,11 +99,11 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- done ----
-  auto* doneCmd = app.add_subcommand("done", "Mark a task as complete");
+  CLI::App* doneCmd = app.add_subcommand("done", "Mark a task as complete");
   std::string doneId;
   doneCmd->add_option("id", doneId, "Task ID (e.g. T001)")->required();
   doneCmd->callback([&]() {
-    auto r = Commands::done(tasksDir, doneId);
+    Result<void> r = Commands::done(tasksDir, doneId);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -111,12 +111,12 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- pause ----
-  auto* pauseCmd = app.add_subcommand("pause",
+  CLI::App* pauseCmd = app.add_subcommand("pause",
       "Pause a task (revert to pending)");
   std::string pauseId;
   pauseCmd->add_option("id", pauseId, "Task ID (e.g. T001)")->required();
   pauseCmd->callback([&]() {
-    auto r = Commands::pause(tasksDir, pauseId);
+    Result<void> r = Commands::pause(tasksDir, pauseId);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -124,12 +124,12 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- deps ----
-  auto* depsCmd = app.add_subcommand("deps",
+  CLI::App* depsCmd = app.add_subcommand("deps",
       "Show dependency information for a task");
   std::string depsId;
   depsCmd->add_option("id", depsId, "Task ID (e.g. T001)")->required();
   depsCmd->callback([&]() {
-    auto r = Commands::deps(tasksDir, depsId);
+    Result<void> r = Commands::deps(tasksDir, depsId);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -137,14 +137,14 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- log ----
-  auto* logCmd = app.add_subcommand("log",
+  CLI::App* logCmd = app.add_subcommand("log",
       "Append a log entry to a task");
   std::string logId;
   logCmd->add_option("id", logId, "Task ID (e.g. T001)")->required();
   std::string logMsg;
   logCmd->add_option("message", logMsg, "Log message")->required();
   logCmd->callback([&]() {
-    auto r = Commands::log(tasksDir, logId, logMsg);
+    Result<void> r = Commands::log(tasksDir, logId, logMsg);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -152,7 +152,7 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- edit ----
-  auto* editCmd = app.add_subcommand("edit",
+  CLI::App* editCmd = app.add_subcommand("edit",
       "Edit task metadata or project settings");
   std::string editId;
   editCmd->add_option("id", editId, "Task ID (omit for project-level edits)");
@@ -184,9 +184,9 @@ int runCLI(int argc, char** argv) {
     std::vector<std::string> deps, files, specs;
     auto splitClean = [](const std::string& s) {
       if (s.empty()) return std::vector<std::string>();
-      auto parts = split(s, ',');
+      std::vector<std::string> parts = split(s, ',');
       std::vector<std::string> clean;
-      for (const auto& p : parts) {
+for (const std::string& p : parts) {
         if (!p.empty()) clean.push_back(p);
       }
       return clean;
@@ -198,7 +198,7 @@ int runCLI(int argc, char** argv) {
     bool critSet = editCritical || editNoCritical;
     bool critVal = editCritical;
 
-    auto r = Commands::edit(tasksDir, editId,
+    Result<void> r = Commands::edit(tasksDir, editId,
         editStatus, deps, editPhase, critSet, critVal,
         files, specs, editPhases, editCriticalPath);
     if (r.hasError()) {
@@ -208,10 +208,10 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- summary ----
-  auto* summaryCmd = app.add_subcommand("summary",
+  CLI::App* summaryCmd = app.add_subcommand("summary",
       "Show overall progress statistics");
   summaryCmd->callback([&]() {
-    auto r = Commands::summary(tasksDir);
+    Result<void> r = Commands::summary(tasksDir);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -219,14 +219,14 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- remove ----
-  auto* removeCmd = app.add_subcommand("remove", "Remove a task");
+  CLI::App* removeCmd = app.add_subcommand("remove", "Remove a task");
   std::string removeId;
   removeCmd->add_option("id", removeId, "Task ID (e.g. T001)")->required();
   bool removeForce = false;
   removeCmd->add_flag("--force", removeForce,
       "Skip file deletion prompt");
   removeCmd->callback([&]() {
-    auto r = Commands::remove(tasksDir, removeId, removeForce);
+    Result<void> r = Commands::remove(tasksDir, removeId, removeForce);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;
@@ -234,13 +234,13 @@ int runCLI(int argc, char** argv) {
   });
 
   // ---- install-skills ----
-  auto* installSkillsCmd = app.add_subcommand("install-skills",
+  CLI::App* installSkillsCmd = app.add_subcommand("install-skills",
       "Install the taskpad AI agent skill file");
   bool installProject = false;
   installSkillsCmd->add_flag("--project", installProject,
       "Install for current project only");
   installSkillsCmd->callback([&]() {
-    auto r = Commands::installSkills(installProject);
+    Result<void> r = Commands::installSkills(installProject);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;

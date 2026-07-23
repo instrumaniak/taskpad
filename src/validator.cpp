@@ -24,7 +24,7 @@ Result<void> validateCircularDependencies(
     const std::vector<std::string>& depends,
     const std::map<std::string, Task>& tasks) {
 
-  for (const auto& dep : depends) {
+for (const std::string& dep : depends) {
     if (dep == taskId) {
       return Result<void>::failure(
           "Circular dependency detected: " + taskId + " depends on itself");
@@ -73,7 +73,7 @@ Result<void> validateTaskExists(
 Result<void> validateDependsExist(
     const std::vector<std::string>& depends,
     const std::map<std::string, Task>& tasks) {
-  for (const auto& dep : depends) {
+for (const std::string& dep : depends) {
     if (tasks.find(dep) == tasks.end()) {
       return Result<void>::failure("Dependency " + dep + " not found");
     }

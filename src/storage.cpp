@@ -161,7 +161,7 @@ Result<void> writeStatusFile(const std::string& taskDir,
     taskNode["status"] = statusToString(t.status);
 
     YAML::Node dependsNode;
-    for (const auto& d : t.depends) {
+for (const std::string& d : t.depends) {
       dependsNode.push_back(d);
     }
     taskNode["depends"] = dependsNode;
@@ -170,13 +170,13 @@ Result<void> writeStatusFile(const std::string& taskDir,
     taskNode["critical"] = t.critical;
 
     YAML::Node filesNode;
-    for (const auto& f : t.files) {
+for (const std::string& f : t.files) {
       filesNode.push_back(f);
     }
     taskNode["files"] = filesNode;
 
     YAML::Node specsNode;
-    for (const auto& s : t.specs) {
+for (const std::string& s : t.specs) {
       specsNode.push_back(s);
     }
     taskNode["specs"] = specsNode;
@@ -188,7 +188,7 @@ Result<void> writeStatusFile(const std::string& taskDir,
   // Phases
   if (!sf.config.phases.empty()) {
     YAML::Node phasesNode;
-    for (const auto& kv : sf.config.phases) {
+  for (const auto& kv : sf.config.phases) {
       phasesNode[std::to_string(kv.first)] = kv.second;
     }
     root["phases"] = phasesNode;
@@ -197,7 +197,7 @@ Result<void> writeStatusFile(const std::string& taskDir,
   // Critical path
   if (!sf.config.criticalPath.empty()) {
     YAML::Node cpNode;
-    for (const auto& id : sf.config.criticalPath) {
+for (const std::string& id : sf.config.criticalPath) {
       cpNode.push_back(id);
     }
     root["critical_path"] = cpNode;

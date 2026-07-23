@@ -663,7 +663,46 @@ Conventions — a JS/TS-friendly C++ style.
 
 ### Explicit Types Rule
 
-All types must be written explicitly. The `auto` keyword is forbidden in production code and tests. Every variable, iterator, cast result, and return value must have its full type written out. Reference file: `src/storage.cpp` demonstrates the correct style (zero `auto` usage).
+Types must be written explicitly by default. The `auto` keyword is forbidden in
+production code and tests, **except** in the following cases where `auto` is
+required for correctness or performance:
+
+- **Lambda variables** — `auto` is required. Lambda types are unnameable; the
+  only explicit alternative (`std::function`) forces heap allocation and type
+  erasure.
+  ```cpp
+  // ✅ required — lambda types are unnameable
+  auto formatTask = [](const Task& t) { ... };
+
+  // ❌ std::function adds heap alloc + type erasure, no benefit
+  std::function<std::string(const Task&)> formatTask = [](...) { ... };
+  ```
+
+- **Range-for loop variables** — `const auto&` is recommended. Writing an
+  explicit type like `const std::pair<const std::string, Task>&` is verbose,
+  provides no safety benefit, and risks accidental copies if the `const` on the
+  key is omitted.
+  ```cpp
+  // ✅ recommended — guaranteed correct, no copies
+  for (const auto& kv : tasks) { ... }
+
+  // ❌ verbose, easy to omit const on key → silent copy
+  for (const std::pair<const std::string, Task>& kv : tasks) { ... }
+  ```
+
+- **Iterator declarations from `.find()` / `.begin()` / iterator loops** —
+  `auto` is preferred. The type is fully determined by the container; spelling
+  it out adds verbosity with no safety or performance benefit.
+  ```cpp
+  // ✅ preferred
+  auto it = tasks.find(dep);
+
+  // ❌ verbose, no safety gain
+  std::map<std::string, Task>::const_iterator it = tasks.find(dep);
+  ```
+
+All other uses of `auto` (function return types, `auto*` pointer declarations,
+cast results, structured bindings, etc.) remain forbidden.
 
 ### Naming Conventions
 
@@ -706,7 +745,7 @@ All types must be written explicitly. The `auto` keyword is forbidden in product
 | `using namespace std;` | `std::` prefix |
 | `#define` (non-macro) | `constexpr` |
 | C-style arrays | `std::array` or `std::vector` |
-| `auto` keyword | explicit type annotation |
+| `auto` keyword (outside §7 exceptions) | explicit type annotation; see §7 (Explicit Types Rule) for permitted exceptions |
 
 ---
 

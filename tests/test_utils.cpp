@@ -40,7 +40,7 @@ TEST_CASE("currentTimestamp format") {
 }
 
 TEST_CASE("split") {
-  auto parts = split("a,b,c", ',');
+  std::vector<std::string> parts = split("a,b,c", ',');
   CHECK(parts.size() == 3);
   CHECK(parts[0] == "a");
   CHECK(parts[1] == "b");

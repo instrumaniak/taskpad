@@ -58,7 +58,7 @@ TEST_CASE("validateCircularDependencies - no cycle") {
   tasks["T003"] = Task();
   tasks["T003"].depends = {"T002"};
 
-  auto r = validateCircularDependencies("T003", {"T002"}, tasks);
+  Result<void> r = validateCircularDependencies("T003", {"T002"}, tasks);
   CHECK(r.hasError() == false);
 }
 
@@ -66,7 +66,7 @@ TEST_CASE("validateCircularDependencies - self dependency") {
   std::map<std::string, Task> tasks;
   tasks["T001"] = Task();
 
-  auto r = validateCircularDependencies("T001", {"T001"}, tasks);
+  Result<void> r = validateCircularDependencies("T001", {"T001"}, tasks);
   CHECK(r.hasError() == true);
   CHECK(r.errorMessage().find("Circular dependency") != std::string::npos);
 }
@@ -81,13 +81,13 @@ TEST_CASE("validateCircularDependencies - transitive cycle") {
   tasks["T003"].depends = {"T002"};
 
   // T001 depends on T002,T003. Can T003 reach T001? No.
-  auto r = validateCircularDependencies("T001", {"T002", "T003"}, tasks);
+  Result<void> r = validateCircularDependencies("T001", {"T002", "T003"}, tasks);
   CHECK(r.hasError() == false);
 
   // Now add that T003 depends on T001 (in the existing graph)
   tasks["T003"].depends = {"T001"};
 
   // T001 depends on T002,T003. Can T003 reach T001? T003 -> T001 -> T003. Yes!
-  auto r2 = validateCircularDependencies("T001", {"T002", "T003"}, tasks);
+  Result<void> r2 = validateCircularDependencies("T001", {"T002", "T003"}, tasks);
   CHECK(r2.hasError() == true);
 }

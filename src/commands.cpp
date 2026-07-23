@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -158,8 +159,8 @@ static bool copyFile(const std::string& src, const std::string& dst) {
   size_t pos = dst.rfind('/');
   if (pos != std::string::npos) {
     std::string dir = dst.substr(0, pos);
-    std::string cmd = "mkdir -p " + dir;
-    static_cast<void>(system(cmd.c_str()));
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
   }
 
   std::ofstream out(dst, std::ios::binary);
@@ -182,12 +183,12 @@ static int countStatus(const std::map<std::string, Task>& tasks,
 
 Result<void> Commands::init(const std::string& tasksDir) {
   std::string dir = tasksDir.empty() ? "specs/tasks" : tasksDir;
-  auto result = createConfig(".", dir);
+  Result<void> result = createConfig(".", dir);
   if (result.hasError()) return result;
 
   // Create task directory if it doesn't exist
-  std::string cmd = "mkdir -p " + dir;
-  static_cast<void>(system(cmd.c_str()));
+  std::error_code ec;
+  std::filesystem::create_directories(dir, ec);
 
   std::cout << "Initialized taskpad in " << dir << "/" << std::endl;
   std::cout << "Created .taskpad config" << std::endl;
@@ -197,38 +198,32 @@ Result<void> Commands::init(const std::string& tasksDir) {
 }
 
 Result<void> Commands::import_(const std::string& tasksDir, bool force) {
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto result = readStatusFile(dir);
+  Result<StatusFile> result = readStatusFile(dir);
   if (!result.hasError() && !force) {
     return Result<void>::failure(
         "status.yaml already exists. Use --force to overwrite");
   }
 
+  std::cout << "Scanning " << dir << "/ for T*.md files..." << std::endl;
+
   std::vector<std::string> taskFiles;
-  std::string globCmd = "ls " + dir + "/T[0-9][0-9][0-9]-*.md 2>/dev/null";
-  FILE* pipe = popen(globCmd.c_str(), "r");
-  if (!pipe) {
-    return Result<void>::failure("Cannot scan " + dir);
-  }
-  char buffer[4096];
-  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-    std::string line = trim(buffer);
-    if (!line.empty()) {
-      taskFiles.push_back(line);
+  std::error_code ec;
+  std::filesystem::path dirPath(dir);
+  for (std::filesystem::directory_iterator it(dirPath, ec), end; it != end; ++it) {
+    if (!std::filesystem::is_regular_file(it->status())) continue;
+    std::string filename = it->path().filename().string();
+    if (filename.size() > 3 && filename.substr(filename.size() - 3) == ".md" &&
+        filename[0] == 'T' && filename.size() > 4 &&
+        std::isdigit(filename[1]) && std::isdigit(filename[2]) && std::isdigit(filename[3]) &&
+        filename[4] == '-') {
+      taskFiles.push_back(it->path().string());
     }
   }
-  pclose(pipe);
+  if (ec) {
+    return Result<void>::failure("Cannot scan " + dir);
+  }
 
   if (taskFiles.empty()) {
     std::cout << "No T*.md files found in " << dir << "/" << std::endl;
@@ -238,7 +233,7 @@ Result<void> Commands::import_(const std::string& tasksDir, bool force) {
   StatusFile sf;
   std::vector<std::string> errors;
 
-  for (const auto& filePath : taskFiles) {
+for (const std::string& filePath : taskFiles) {
     // Extract ID and name from filename
     std::string filename = filePath;
     size_t slashPos = filename.rfind('/');
@@ -264,7 +259,7 @@ Result<void> Commands::import_(const std::string& tasksDir, bool force) {
     }
 
     // Read file content
-    auto contentResult = readTaskFile(filePath);
+    Result<std::string> contentResult = readTaskFile(filePath);
     if (contentResult.hasError()) {
       errors.push_back(contentResult.errorMessage());
       continue;
@@ -288,8 +283,8 @@ Result<void> Commands::import_(const std::string& tasksDir, bool force) {
   }
 
   // Validate dependencies exist
-  for (auto& kv : sf.tasks) {
-    for (const auto& dep : kv.second.depends) {
+for (std::pair<const std::string, Task>& kv : sf.tasks) {
+for (const std::string& dep : kv.second.depends) {
       if (sf.tasks.find(dep) == sf.tasks.end()) {
         errors.push_back("Task " + kv.first + " depends on " + dep +
                          " which was not found");
@@ -299,7 +294,7 @@ Result<void> Commands::import_(const std::string& tasksDir, bool force) {
 
   // Validate no circular dependencies
   for (const auto& kv : sf.tasks) {
-    auto cycleResult = validateCircularDependencies(
+    Result<void> cycleResult = validateCircularDependencies(
         kv.first, kv.second.depends, sf.tasks);
     if (cycleResult.hasError()) {
       errors.push_back(cycleResult.errorMessage());
@@ -310,12 +305,12 @@ Result<void> Commands::import_(const std::string& tasksDir, bool force) {
     // Still write, but report errors
     std::cerr << "warning: " << errors.size() << " issue(s) found"
               << std::endl;
-    for (const auto& err : errors) {
+for (const std::string& err : errors) {
       std::cerr << "  " << err << std::endl;
     }
   }
 
-  auto writeResult = writeStatusFile(dir, sf);
+  Result<void> writeResult = writeStatusFile(dir, sf);
   if (writeResult.hasError()) return writeResult;
 
   int done = countStatus(sf.tasks, Status::Done);
@@ -346,17 +341,10 @@ Result<void> Commands::new_(const std::string& tasksDir,
     return Result<void>::failure("Task name cannot be empty");
   }
 
-  std::string dir;
-  auto dirResult = readTaskDir(".");
-  if (dirResult.hasError()) {
-    dir = tasksDir.empty() ? "specs/tasks" : tasksDir;
-  } else {
-    dir = dirResult.value;
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
   StatusFile sf;
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (!readResult.hasError()) {
     sf = readResult.value;
   }
@@ -371,7 +359,7 @@ Result<void> Commands::new_(const std::string& tasksDir,
   }
 
   // Validate depends
-  for (const auto& dep : depends) {
+for (const std::string& dep : depends) {
     if (!isValidTaskId(dep)) {
       return Result<void>::failure("Invalid dependency ID: " + dep);
     }
@@ -382,14 +370,25 @@ Result<void> Commands::new_(const std::string& tasksDir,
 
   std::string nextId = findNextTaskId(sf.tasks);
 
+  // Build a temporary task to validate cycles
+  Task tempTask;
+  tempTask.id = nextId;
+  tempTask.depends = depends;
+  sf.tasks[nextId] = tempTask;
+
   // Validate circular deps
-  auto cycleResult = validateCircularDependencies(
+  Result<void> cycleResult = validateCircularDependencies(
       nextId, depends, sf.tasks);
-  if (cycleResult.hasError()) return cycleResult;
+  if (cycleResult.hasError()) {
+    sf.tasks.erase(nextId);
+    return cycleResult;
+  }
+
+  sf.tasks.erase(nextId);
 
   // Create task file
   std::string filePath = taskFilePath(dir, nextId, name);
-  auto fileResult = writeTaskFile(filePath, nextId, name);
+  Result<void> fileResult = writeTaskFile(filePath, nextId, name);
   if (fileResult.hasError()) return fileResult;
 
   // Add to status
@@ -403,7 +402,7 @@ Result<void> Commands::new_(const std::string& tasksDir,
 
   sf.tasks[nextId] = task;
 
-  auto writeResult = writeStatusFile(dir, sf);
+  Result<void> writeResult = writeStatusFile(dir, sf);
   if (writeResult.hasError()) return writeResult;
 
   std::cout << "Created " << nextId << "-" << toKebabCase(name)
@@ -414,19 +413,9 @@ Result<void> Commands::new_(const std::string& tasksDir,
 }
 
 Result<void> Commands::status(const std::string& tasksDir) {
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -489,10 +478,10 @@ Result<void> Commands::status(const std::string& tasksDir) {
     }
     std::cout << std::endl;
 
-    auto& ids = byPhase[pNum];
+    std::vector<std::string>& ids = byPhase[pNum];
     std::sort(ids.begin(), ids.end());
 
-    for (const auto& id : ids) {
+for (const std::string& id : ids) {
       const Task& t = sf.tasks.at(id);
       std::cout << "  " << t.id << "  " << t.name;
 
@@ -538,19 +527,9 @@ Result<void> Commands::status(const std::string& tasksDir) {
 }
 
 Result<void> Commands::next(const std::string& tasksDir) {
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -587,7 +566,7 @@ Result<void> Commands::next(const std::string& tasksDir) {
   // Dependencies
   if (!best.depends.empty()) {
     std::cout << "  Depends on:";
-    for (const auto& dep : best.depends) {
+  for (const auto& dep : best.depends) {
       auto depIt = sf.tasks.find(dep);
       if (depIt != sf.tasks.end()) {
         std::cout << " " << depIt->first << " ["
@@ -604,7 +583,7 @@ Result<void> Commands::next(const std::string& tasksDir) {
 
   // Read task file
   std::string filePath = taskFilePath(dir, best.id, best.name);
-  auto contentResult = readTaskFile(filePath);
+  Result<std::string> contentResult = readTaskFile(filePath);
   if (!contentResult.hasError()) {
     std::string content = contentResult.value;
     std::string goal = extractGoal(content);
@@ -621,7 +600,7 @@ Result<void> Commands::next(const std::string& tasksDir) {
   // Files
   if (!best.files.empty()) {
     std::cout << "  Files:";
-    for (const auto& f : best.files) {
+for (const std::string& f : best.files) {
       std::cout << " " << f;
     }
     std::cout << std::endl;
@@ -630,7 +609,7 @@ Result<void> Commands::next(const std::string& tasksDir) {
   // Specs
   if (!best.specs.empty()) {
     std::cout << "  Specs:";
-    for (const auto& s : best.specs) {
+for (const std::string& s : best.specs) {
       std::cout << " " << s;
     }
     std::cout << std::endl;
@@ -646,19 +625,9 @@ Result<void> Commands::do_(const std::string& tasksDir,
         "Invalid task ID format. Expected TXXX (see Task ID Format)");
   }
 
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -679,19 +648,21 @@ Result<void> Commands::do_(const std::string& tasksDir,
 
   // Check dependencies
   if (!force && !allDepsDone(task, sf.tasks)) {
+    std::string blockers;
     for (const auto& dep : task.depends) {
       auto depIt = sf.tasks.find(dep);
       if (depIt != sf.tasks.end() &&
           depIt->second.status != Status::Done) {
-        std::cerr << "warning: Task " << taskId << " depends on "
-                  << dep << " (" << statusToString(depIt->second.status)
-                  << "). Use --force to proceed" << std::endl;
+        if (!blockers.empty()) blockers += ", ";
+        blockers += dep + " (" + statusToString(depIt->second.status) + ")";
       }
     }
+    return Result<void>::failure(
+        "Unmet dependencies: " + blockers + ". Use --force to proceed");
   }
 
   task.status = Status::InProgress;
-  auto writeResult = writeStatusFile(dir, sf);
+  Result<void> writeResult = writeStatusFile(dir, sf);
   if (writeResult.hasError()) return writeResult;
 
   std::cout << "Started " << taskId << " \u2014 " << task.name << std::endl;
@@ -699,7 +670,7 @@ Result<void> Commands::do_(const std::string& tasksDir,
 
   // Read and display task info
   std::string filePath = taskFilePath(dir, taskId, task.name);
-  auto contentResult = readTaskFile(filePath);
+  Result<std::string> contentResult = readTaskFile(filePath);
   if (!contentResult.hasError()) {
     std::cout << std::endl << "Now reading " << filePath << "..." << std::endl;
     std::string content = contentResult.value;
@@ -723,19 +694,9 @@ Result<void> Commands::done(const std::string& tasksDir,
         "Invalid task ID format. Expected TXXX (see Task ID Format)");
   }
 
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -750,14 +711,14 @@ Result<void> Commands::done(const std::string& tasksDir,
   }
 
   taskIt->second.status = Status::Done;
-  auto writeResult = writeStatusFile(dir, sf);
+  Result<void> writeResult = writeStatusFile(dir, sf);
   if (writeResult.hasError()) return writeResult;
 
   std::cout << "\u2713 " << taskId << " marked as done" << std::endl;
 
   // Find newly unblocked tasks
   std::vector<std::string> unblocked;
-  for (auto& kv : sf.tasks) {
+  for (const auto& kv : sf.tasks) {
     if (kv.second.status != Status::Pending) continue;
     if (!allDepsDone(kv.second, sf.tasks)) continue;
     // Previously blocked by this task
@@ -769,20 +730,9 @@ Result<void> Commands::done(const std::string& tasksDir,
     }
   }
 
-  // Also check tasks that had any dependency not done
-  for (auto& kv : sf.tasks) {
-    if (kv.second.status != Status::Pending) continue;
-    if (!allDepsDone(kv.second, sf.tasks)) continue;
-    if (std::find(unblocked.begin(), unblocked.end(), kv.first) ==
-        unblocked.end()) {
-      // Check if previously was blocked
-      unblocked.push_back(kv.first);
-    }
-  }
-
   if (!unblocked.empty()) {
     std::cout << std::endl << "Unblocked tasks:" << std::endl;
-    for (const auto& id : unblocked) {
+for (const std::string& id : unblocked) {
       const Task& t = sf.tasks.at(id);
       std::cout << "  " << id << "  " << t.name << "  [pending]"
                 << std::endl;
@@ -799,19 +749,9 @@ Result<void> Commands::pause(const std::string& tasksDir,
         "Invalid task ID format. Expected TXXX (see Task ID Format)");
   }
 
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -827,7 +767,7 @@ Result<void> Commands::pause(const std::string& tasksDir,
 
   std::string oldStatus = statusToString(taskIt->second.status);
   taskIt->second.status = Status::Pending;
-  auto writeResult = writeStatusFile(dir, sf);
+  Result<void> writeResult = writeStatusFile(dir, sf);
   if (writeResult.hasError()) return writeResult;
 
   std::cout << "Paused " << taskId << " \u2014 " << taskIt->second.name
@@ -845,19 +785,9 @@ Result<void> Commands::deps(const std::string& tasksDir,
         "Invalid task ID format. Expected TXXX (see Task ID Format)");
   }
 
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -873,7 +803,7 @@ Result<void> Commands::deps(const std::string& tasksDir,
   if (task.depends.empty()) {
     std::cout << "  (none)" << std::endl;
   } else {
-    for (const auto& dep : task.depends) {
+  for (const auto& dep : task.depends) {
       auto depIt = sf.tasks.find(dep);
       std::cout << "  " << dep;
       if (depIt != sf.tasks.end()) {
@@ -929,19 +859,9 @@ Result<void> Commands::log(const std::string& tasksDir,
     return Result<void>::failure("Log message cannot be empty");
   }
 
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -952,7 +872,7 @@ Result<void> Commands::log(const std::string& tasksDir,
   }
 
   std::string filePath = taskFilePath(dir, taskId, taskIt->second.name);
-  auto logResult = appendLog(filePath, message);
+  Result<void> logResult = appendLog(filePath, message);
   if (logResult.hasError()) return logResult;
 
   std::cout << "Logged to " << filePath << std::endl;
@@ -971,19 +891,9 @@ Result<void> Commands::edit(const std::string& tasksDir,
     const std::string& phases,
     const std::string& criticalPath) {
 
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -994,9 +904,9 @@ Result<void> Commands::edit(const std::string& tasksDir,
 
     if (!phases.empty()) {
       std::map<int, std::string> newPhases;
-      auto pairs = split(phases, ',');
-      for (const auto& pair : pairs) {
-        auto parts = split(pair, ':');
+      std::vector<std::string> pairs = split(phases, ',');
+for (const std::string& pair : pairs) {
+        std::vector<std::string> parts = split(pair, ':');
         if (parts.size() == 2) {
           int num = std::stoi(parts[0]);
           newPhases[num] = trim(parts[1]);
@@ -1009,7 +919,7 @@ Result<void> Commands::edit(const std::string& tasksDir,
     if (!criticalPath.empty()) {
       std::vector<std::string> cp = split(criticalPath, ',');
       // Validate task IDs exist
-      for (const auto& id : cp) {
+for (const std::string& id : cp) {
         if (sf.tasks.find(id) == sf.tasks.end()) {
           return Result<void>::failure(
               "Task " + id + " in critical path not found");
@@ -1024,7 +934,7 @@ Result<void> Commands::edit(const std::string& tasksDir,
           "No project-level changes specified. Use --phases or --critical-path");
     }
 
-    auto writeResult = writeStatusFile(dir, sf);
+    Result<void> writeResult = writeStatusFile(dir, sf);
     if (writeResult.hasError()) return writeResult;
 
     if (!phases.empty()) {
@@ -1062,11 +972,11 @@ Result<void> Commands::edit(const std::string& tasksDir,
 
   if (!depends.empty()) {
     // Validate depends exist
-    auto depResult = validateDependsExist(depends, sf.tasks);
+    Result<void> depResult = validateDependsExist(depends, sf.tasks);
     if (depResult.hasError()) return depResult;
 
     // Validate no circular deps
-    auto cycleResult = validateCircularDependencies(
+    Result<void> cycleResult = validateCircularDependencies(
         taskId, depends, sf.tasks);
     if (cycleResult.hasError()) return cycleResult;
 
@@ -1103,7 +1013,7 @@ Result<void> Commands::edit(const std::string& tasksDir,
         "No changes specified. Use --status, --phase, --critical, --depends, --files, or --specs");
   }
 
-  auto writeResult = writeStatusFile(dir, sf);
+  Result<void> writeResult = writeStatusFile(dir, sf);
   if (writeResult.hasError()) return writeResult;
 
   std::cout << "Updated " << taskId;
@@ -1129,19 +1039,9 @@ Result<void> Commands::edit(const std::string& tasksDir,
 }
 
 Result<void> Commands::summary(const std::string& tasksDir) {
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -1230,19 +1130,9 @@ Result<void> Commands::remove(const std::string& tasksDir,
         "Invalid task ID format. Expected TXXX (see Task ID Format)");
   }
 
-  std::string dir;
-  {
-    auto r = readTaskDir(".");
-    if (r.hasError()) {
-      if (!tasksDir.empty()) dir = tasksDir;
-      else dir = "specs/tasks";
-    } else {
-      dir = r.value;
-    }
-  }
-  if (!tasksDir.empty()) dir = tasksDir;
+  std::string dir = resolveTaskDir(tasksDir);
 
-  auto readResult = readStatusFile(dir);
+  Result<StatusFile> readResult = readStatusFile(dir);
   if (readResult.hasError()) return Result<void>::failure(readResult.errorMessage());
 
   StatusFile sf = readResult.value;
@@ -1275,10 +1165,10 @@ Result<void> Commands::remove(const std::string& tasksDir,
   sf.tasks.erase(taskIt);
 
   // Also remove from critical path if present
-  auto& cp = sf.config.criticalPath;
+  std::vector<std::string>& cp = sf.config.criticalPath;
   cp.erase(std::remove(cp.begin(), cp.end(), taskId), cp.end());
 
-  auto writeResult = writeStatusFile(dir, sf);
+  Result<void> writeResult = writeStatusFile(dir, sf);
   if (writeResult.hasError()) return writeResult;
 
   std::cout << "Removed " << taskId << " \u2014 " << taskName << std::endl;

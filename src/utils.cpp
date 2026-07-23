@@ -1,7 +1,9 @@
 #include "utils.h"
+#include "storage.h"
 #include <algorithm>
 #include <cctype>
 #include <ctime>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
 
@@ -86,6 +88,13 @@ std::string trim(const std::string& s) {
   size_t end = s.size();
   while (end > start && std::isspace(s[end - 1])) --end;
   return s.substr(start, end - start);
+}
+
+std::string resolveTaskDir(const std::string& tasksDir) {
+  if (!tasksDir.empty()) return tasksDir;
+  Result<std::string> r = readTaskDir(".");
+  if (r.hasError()) return "specs/tasks";
+  return r.value;
 }
 
 } // namespace taskpad

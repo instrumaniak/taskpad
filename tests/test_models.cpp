@@ -54,24 +54,24 @@ TEST_CASE("Task struct with values") {
 }
 
 TEST_CASE("Result success") {
-  auto r = Result<int>::success(42);
+  Result<int> r = Result<int>::success(42);
   CHECK(!r.hasError());
   CHECK(r.value == 42);
 }
 
 TEST_CASE("Result failure") {
-  auto r = Result<int>::failure("error message");
+  Result<int> r = Result<int>::failure("error message");
   CHECK(r.hasError());
   CHECK(r.errorMessage() == "error message");
 }
 
 TEST_CASE("Result<void> success") {
-  auto r = Result<void>::success();
+  Result<void> r = Result<void>::success();
   CHECK(!r.hasError());
 }
 
 TEST_CASE("Result<void> failure") {
-  auto r = Result<void>::failure("void error");
+  Result<void> r = Result<void>::failure("void error");
   CHECK(r.hasError());
   CHECK(r.errorMessage() == "void error");
 }

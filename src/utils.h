@@ -12,5 +12,6 @@ std::string normalizePath(const std::string& path);
 std::string currentTimestamp();
 std::vector<std::string> split(const std::string& s, char delimiter);
 std::string trim(const std::string& s);
+std::string resolveTaskDir(const std::string& tasksDir);
 
 } // namespace taskpad

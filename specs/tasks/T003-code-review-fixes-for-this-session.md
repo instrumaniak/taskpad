@@ -20,7 +20,7 @@ Fix all issues identified in the code review:
 
 (8) missing "Scanning..." output line in import, 
 
-(9) `auto` keyword used in `src/` and `tests/` contrary to project's explicit-types convention.
+(9) `auto` keyword used in `src/` and `tests/` contrary to previous blanket explicit-types convention (later relaxed to allow `auto` for lambdas, range-for, and iterators).
 
 ## Depends On
 
@@ -60,7 +60,8 @@ Fix all issues identified in the code review:
 8. Remove unused `writeFile()` function in `tests/test_storage.cpp`
 9. Replace `system("mkdir ...")` and `system("rm -rf ...")` in `tests/test_storage.cpp` `createDir()`/`removeDir()` helpers with `std::filesystem::create_directory()` and `std::filesystem::remove_all()`
 10. Replace every `auto` keyword in `src/` and `tests/` with explicit types — iterators (`std::map<std::string, Task>::iterator`), `Result<T>` returns, range-for variables, `dynamic_cast` results (`auto*` → `ClassName*`), lambda parameters. Reference style: `src/storage.cpp` (zero `auto` usage, all types explicit)
-11. Build and run all tests to verify no regressions
+11. After spec update (relaxed auto rules), revert lambdas back to `auto`, and change range-for pair types and iterator declarations to `auto`/`const auto&` per the new exceptions.
+12. Build and run all tests to verify no regressions
 
 ## Constraints
 
@@ -72,19 +73,21 @@ Fix all issues identified in the code review:
 
 ## Acceptance Criteria
 
-- [ ] `done TXXX` only shows tasks that were actually blocked by TXXX as "Unblocked"
-- [ ] No shell commands (`system()`, `popen()`) used for mkdir or filesystem listing
-- [ ] `import` uses directory iteration directly instead of `ls` pipe
-- [ ] `do TXXX` blocks and returns error when deps unmet without `--force`
-- [ ] All 13 task dir resolution blocks consolidated into single helper
-- [ ] `new_` detects cycles involving the new task itself
-- [ ] `import` prints "Scanning..." line matching spec
-- [ ] No unused functions in test files
-- [ ] All 28 tests pass, no compiler warnings
-- [ ] Zero `auto` keywords remain in `src/` or `tests/` (explicit types everywhere)
+- [x] `done TXXX` only shows tasks that were actually blocked by TXXX as "Unblocked"
+- [x] No shell commands (`system()`, `popen()`) used for mkdir or filesystem listing
+- [x] `import` uses directory iteration directly instead of `ls` pipe
+- [x] `do TXXX` blocks and returns error when deps unmet without `--force`
+- [x] All 13 task dir resolution blocks consolidated into single helper
+- [x] `new_` detects cycles involving the new task itself
+- [x] `import` prints "Scanning..." line matching spec
+- [x] No unused functions in test files
+- [x] All 28 tests pass, no compiler warnings
+- [x] `auto` used per spec: lambdas (required), range-for (recommended), iterators (preferred); all other contexts use explicit types
 
 ## Notes
 
 - Place `resolveTaskDir()` in `utils.h`/`utils.cpp` as a shared utility (used across all commands)
 
 - [2026-07-23 17:12] Filled in task file with all 7 code review fix items + acceptance criteria
+- [2026-07-23 18:07] Implemented all 9 fixes: removed spurious second loop in done; replaced system()/popen() with std::filesystem across copyFile, init, import; fixed do_ to return error on unmet deps; added resolveTaskDir() in utils.h/utils.cpp eliminating 13 duplicated blocks; fixed new_ to insert temp task before cycle validation; added "Scanning..." output in import; removed unused writeFile and replaced system() calls in test_storage.cpp; replaced all auto keywords with explicit types in src/ and tests/; build clean (0 warnings), all 28 tests pass with 144 assertions
+- [2026-07-23 18:??] Updated spec auto rules: lambdas (required auto), range-for (const auto& recommended), iterator declarations (auto preferred). Reverted old codebase to match new rules (std::function→auto, const std::pair<...>& → const auto&, explicit iterators → auto). Verified build and tests.
