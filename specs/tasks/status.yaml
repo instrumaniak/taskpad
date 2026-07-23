@@ -1,0 +1,18 @@
+tasks:
+  T001:
+    name: Enhance import to extract phase specs and files
+    status: pending
+    depends: ~
+    phase: 1
+    critical: false
+    files: ~
+    specs: ~
+  T002:
+    name: Prepare cardgame repo for taskpad management
+    status: pending
+    depends:
+      - T001
+    phase: 1
+    critical: false
+    files: ~
+    specs: ~
