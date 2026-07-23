@@ -767,39 +767,60 @@ sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev doctest-dev
 
 ### Build System
 
-Use a simple Makefile (no CMake needed for this project size):
-
 ```makefile
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O2
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -Isrc
 DEBUG_FLAGS = -g -O0 -DDEBUG
+LDFLAGS = -lyaml-cpp
+
+PREFIX ?= $(HOME)/.local
 
 SRCDIR = src
 BUILDDIR = build
 TARGET = taskpad
 
-# Sources
 SRCS = $(wildcard $(SRCDIR)/*.cpp)
 OBJS = $(patsubst $(SRCDIR)/%.cpp, $(BUILDDIR)/%.o, $(SRCS))
 
-# Libraries
-LIBS = -lyaml-cpp
+TESTDIR = tests
+TEST_SRCS = $(wildcard $(TESTDIR)/test_*.cpp)
+TEST_OBJS = $(patsubst $(TESTDIR)/%.cpp, $(BUILDDIR)/%.o, $(TEST_SRCS))
+TEST_TARGET = $(BUILDDIR)/test_taskpad
 
-.PHONY: all clean install test debug
+TASKPAD_DATA_DIR ?= .agents
+
+.PHONY: all clean install install-bin install-skills-data test e2e-test check debug uninstall
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -DTASKPAD_DATA_DIR=\"$(TASKPAD_DATA_DIR)\" -c -o $@ $<
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 debug: CXXFLAGS += $(DEBUG_FLAGS)
 debug: clean all
+
+$(BUILDDIR)/test_main.o: $(TESTDIR)/test_main.cpp | $(BUILDDIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILDDIR)/test_%.o: $(TESTDIR)/test_%.cpp | $(BUILDDIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(TEST_TARGET): $(TEST_OBJS) $(filter-out $(BUILDDIR)/main.o, $(OBJS))
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+test: $(TEST_TARGET)
+	./$(TEST_TARGET)
+
+e2e-test: $(TARGET)
+	node --test tests/e2e/
+
+check: test e2e-test
 
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
@@ -814,12 +835,10 @@ install-skills-data:
 	install -d $(DESTDIR)$(PREFIX)/share/taskpad/skills
 	cp -r .agents/skills/taskpad $(DESTDIR)$(PREFIX)/share/taskpad/skills/
 
-test: $(TARGET)
-	./tests/run_tests.sh
-
 uninstall:
 	rm -f $(HOME)/.local/bin/$(TARGET)
 	rm -rf $(HOME)/.local/share/taskpad
+	rm -rf $(HOME)/.agents/skills/taskpad
 ```
 
 ### Code Structure
@@ -838,21 +857,38 @@ taskpad/
 │   ├── storage.h
 │   ├── validator.cpp         # Input validation
 │   ├── validator.h
-│   └── utils.cpp             # String helpers, file utils
+│   ├── utils.cpp             # String helpers, file utils
 │   └── utils.h
 ├── include/
 │   └── taskpad/
 │       └── taskpad.h         # Public API header (optional)
 ├── tests/
-│   ├── test_models.cpp       # Unit tests for data structures
-│   ├── test_storage.cpp      # Unit tests for YAML I/O
-│   ├── test_commands.cpp     # Unit tests for command logic
-│   ├── test_validator.cpp    # Unit tests for validation
+│   ├── helpers.mjs           # E2E test helpers (createProject, run, ...)
+│   ├── e2e/                  # E2E tests (node:test)
+│   │   ├── init.mjs
+│   │   ├── new.mjs
+│   │   ├── remove.mjs
+│   │   ├── status.mjs
+│   │   ├── next.mjs
+│   │   ├── do.mjs
+│   │   ├── done.mjs
+│   │   ├── pause.mjs
+│   │   ├── deps.mjs
+│   │   ├── log.mjs
+│   │   ├── edit.mjs
+│   │   ├── summary.mjs
+│   │   └── install-skills.mjs
+│   ├── data/                 # Unit test fixtures
+│   │   ├── sample_status.yaml
+│   │   └── sample_tasks/
 │   ├── test_main.cpp         # doctest main
-│   └── data/                 # Test fixtures
-│       ├── sample_status.yaml
-│       └── sample_tasks/
+│   ├── test_models.cpp       # Unit tests: models
+│   ├── test_storage.cpp      # Unit tests: YAML I/O
+│   ├── test_utils.cpp        # Unit tests: string helpers
+│   └── test_validator.cpp    # Unit tests: validation
 ├── specs/
+│   ├── spec.main.md          # Main specification
+│   ├── spec.testing.md       # Testing specification
 │   └── tasks/                # Example task directory
 │       ├── status.yaml
 │       └── T001-example.md
@@ -880,73 +916,11 @@ taskpad/
 
 ## 9. Testing
 
-### Framework
+Testing uses a two-tier approach:
+- **Unit tests**: C++ doctest (in-process, fast)
+- **E2E tests**: Node.js `node:test` (binary-as-API via CLI)
 
-Use **doctest** (installed via system package):
-
-```cpp
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
-```
-
-### Test Organization
-
-| Test File | Coverage |
-|-----------|----------|
-| `test_models.cpp` | Task struct, Status enum, ProjectConfig |
-| `test_storage.cpp` | YAML read/write, file I/O |
-| `test_commands.cpp` | Command logic (init, new, status, next, etc.) |
-| `test_validator.cpp` | Input validation, edge cases |
-
-### Test Examples
-
-```cpp
-// test_models.cpp
-#include <doctest/doctest.h>
-#include "models.h"
-
-TEST_CASE("Task ID formatting") {
-    CHECK(taskpad::formatTaskId(1) == "T001");
-    CHECK(taskpad::formatTaskId(42) == "T042");
-    CHECK(taskpad::formatTaskId(999) == "T999");
-}
-
-TEST_CASE("Status string conversion") {
-    CHECK(taskpad::statusToString(taskpad::Status::Pending) == "pending");
-    CHECK(taskpad::statusToString(taskpad::Status::InProgress) == "in_progress");
-    CHECK(taskpad::statusToString(taskpad::Status::Done) == "done");
-}
-
-TEST_CASE("Dependency validation") {
-    taskpad::Task t;
-    t.id = "T003";
-    t.depends = {"T001", "T002"};
-    
-    std::map<std::string, taskpad::Task> tasks;
-    tasks["T001"] = {.id = "T001", .status = taskpad::Status::Done};
-    tasks["T002"] = {.id = "T002", .status = taskpad::Status::Pending};
-    
-    auto result = taskpad::validateDependencies(t, tasks);
-    CHECK(result.hasError());
-    CHECK(result.errorMessage() == "Dependency T002 is not done");
-}
-```
-
-### Running Tests
-
-```bash
-# Build and run tests
-make test
-
-# Or manually
-g++ -std=c++17 -Isrc tests/test_main.cpp tests/test_models.cpp src/models.cpp -o tests/test_models && ./tests/test_models
-```
-
-### Test Coverage Requirements
-
-- All public functions must have at least one test
-- Edge cases must be tested (empty input, invalid IDs, missing files)
-- Integration tests for CLI commands (using temporary directories)
+See [specs/spec.testing.md](spec.testing.md) for the complete testing specification.
 
 ---
 
@@ -1008,8 +982,12 @@ sudo apt install libcli11-dev libyaml-cpp-dev nlohmann-json3-dev doctest-dev
 # Build
 make
 
-# Run tests
-make test
+# Build and run all tests (unit + E2E)
+make check
+
+# Or run separately
+make test       # Unit tests only
+make e2e-test   # E2E tests only
 
 # Install
 make install

@@ -21,7 +21,7 @@ TEST_TARGET = $(BUILDDIR)/test_taskpad
 # Skill data directory (for install-skills command)
 TASKPAD_DATA_DIR ?= .agents
 
-.PHONY: all clean install install-bin install-skills-data test debug uninstall
+.PHONY: all clean install install-bin install-skills-data test e2e-test check debug uninstall
 
 all: $(TARGET)
 
@@ -48,6 +48,11 @@ $(TEST_TARGET): $(TEST_OBJS) $(filter-out $(BUILDDIR)/main.o, $(OBJS))
 
 test: $(TEST_TARGET)
 	./$(TEST_TARGET)
+
+e2e-test: $(TARGET)
+	node --test tests/e2e/
+
+check: test e2e-test
 
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
