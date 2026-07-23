@@ -16,3 +16,11 @@ tasks:
     critical: false
     files: ~
     specs: ~
+  T003:
+    name: Code review fixes for this session
+    status: pending
+    depends: ~
+    phase: 0
+    critical: true
+    files: ~
+    specs: ~

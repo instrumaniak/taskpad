@@ -661,6 +661,10 @@ No stack traces, no debug output, no unexpected crashes.
 
 Conventions — a JS/TS-friendly C++ style.
 
+### Explicit Types Rule
+
+All types must be written explicitly. The `auto` keyword is forbidden in production code and tests. Every variable, iterator, cast result, and return value must have its full type written out. Reference file: `src/storage.cpp` demonstrates the correct style (zero `auto` usage).
+
 ### Naming Conventions
 
 | Construct | Convention | Example |
@@ -702,6 +706,7 @@ Conventions — a JS/TS-friendly C++ style.
 | `using namespace std;` | `std::` prefix |
 | `#define` (non-macro) | `constexpr` |
 | C-style arrays | `std::array` or `std::vector` |
+| `auto` keyword | explicit type annotation |
 
 ---
 
