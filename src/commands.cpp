@@ -279,6 +279,10 @@ for (const std::string& filePath : taskFiles) {
     // Parse dependencies
     task.depends = extractDepends(content);
 
+    // Parse phase and critical from task file sections
+    task.phase = extractPhase(content);
+    task.critical = extractCritical(content);
+
     sf.tasks[id] = task;
   }
 
@@ -483,7 +487,13 @@ Result<void> Commands::status(const std::string& tasksDir) {
 
 for (const std::string& id : ids) {
       const Task& t = sf.tasks.at(id);
-      std::cout << "  " << t.id << "  " << t.name;
+      if (t.status == Status::Done) {
+        std::cout << "\u2713 " << t.id << "  " << t.name;
+      } else if (id == nextTaskId) {
+        std::cout << "\u2192 " << t.id << "  " << t.name;
+      } else {
+        std::cout << "  " << t.id << "  " << t.name;
+      }
 
       // Padding
       int padding = 20 - static_cast<int>(t.name.size());
@@ -581,7 +591,7 @@ Result<void> Commands::next(const std::string& tasksDir) {
     std::cout << std::endl;
   }
 
-  // Read task file
+  // Read task file for details
   std::string filePath = taskFilePath(dir, best.id, best.name);
   Result<std::string> contentResult = readTaskFile(filePath);
   if (!contentResult.hasError()) {
@@ -595,24 +605,28 @@ Result<void> Commands::next(const std::string& tasksDir) {
     if (!firstStep.empty()) {
       std::cout << "  First step: " << firstStep << std::endl;
     }
-  }
 
-  // Files
-  if (!best.files.empty()) {
-    std::cout << "  Files:";
-for (const std::string& f : best.files) {
-      std::cout << " " << f;
+    // Files (parsed from T*.md)
+    std::vector<std::string> files = extractSectionListItems(
+        content, "## Files to Create/Modify");
+    if (!files.empty()) {
+      std::cout << "  Files:";
+      for (const std::string& f : files) {
+        std::cout << " " << f;
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
-  }
 
-  // Specs
-  if (!best.specs.empty()) {
-    std::cout << "  Specs:";
-for (const std::string& s : best.specs) {
-      std::cout << " " << s;
+    // Specs (parsed from T*.md)
+    std::vector<std::string> specs = extractSectionListItems(
+        content, "## Spec References");
+    if (!specs.empty()) {
+      std::cout << "  Specs:";
+      for (const std::string& s : specs) {
+        std::cout << " " << s;
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
   }
 
   return Result<void>::success();
@@ -886,8 +900,6 @@ Result<void> Commands::edit(const std::string& tasksDir,
     const std::string& phase,
     bool criticalSet,
     bool criticalVal,
-    const std::vector<std::string>& files,
-    const std::vector<std::string>& specs,
     const std::string& phases,
     const std::string& criticalPath) {
 
@@ -998,19 +1010,9 @@ for (const std::string& id : cp) {
     changed = true;
   }
 
-  if (!files.empty()) {
-    task.files = files;
-    changed = true;
-  }
-
-  if (!specs.empty()) {
-    task.specs = specs;
-    changed = true;
-  }
-
   if (!changed) {
     return Result<void>::failure(
-        "No changes specified. Use --status, --phase, --critical, --depends, --files, or --specs");
+        "No changes specified. Use --status, --phase, --critical, or --depends");
   }
 
   Result<void> writeResult = writeStatusFile(dir, sf);

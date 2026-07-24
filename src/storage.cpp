@@ -120,8 +120,6 @@ Result<StatusFile> readStatusFile(const std::string& taskDir) {
         task.depends = parseStringList(t["depends"]);
         task.phase = t["phase"] ? t["phase"].as<int>() : 0;
         task.critical = t["critical"] ? t["critical"].as<bool>() : false;
-        task.files = parseStringList(t["files"]);
-        task.specs = parseStringList(t["specs"]);
         sf.tasks[id] = task;
       }
     }
@@ -168,18 +166,6 @@ for (const std::string& d : t.depends) {
 
     taskNode["phase"] = t.phase;
     taskNode["critical"] = t.critical;
-
-    YAML::Node filesNode;
-for (const std::string& f : t.files) {
-      filesNode.push_back(f);
-    }
-    taskNode["files"] = filesNode;
-
-    YAML::Node specsNode;
-for (const std::string& s : t.specs) {
-      specsNode.push_back(s);
-    }
-    taskNode["specs"] = specsNode;
 
     tasksNode[t.id] = taskNode;
   }
@@ -247,6 +233,14 @@ Result<void> writeTaskFile(const std::string& path,
     "## Depends On\n"
     "\n"
     "(None)\n"
+    "\n"
+    "## Phase:\n"
+    "\n"
+    "(Add phase number here)\n"
+    "\n"
+    "## Critical:\n"
+    "\n"
+    "(Add critical flag here)\n"
     "\n"
     "## Spec References\n"
     "\n"

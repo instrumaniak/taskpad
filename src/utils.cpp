@@ -97,4 +97,93 @@ std::string resolveTaskDir(const std::string& tasksDir) {
   return r.value;
 }
 
+int extractPhase(const std::string& content) {
+  size_t pos = content.find("## Phase:");
+  if (pos == std::string::npos) return 0;
+
+  size_t colonPos = content.find(':', pos);
+  if (colonPos == std::string::npos) return 0;
+
+  size_t valueStart = colonPos + 1;
+  while (valueStart < content.size() && std::isspace(content[valueStart])) {
+    ++valueStart;
+  }
+
+  size_t valueEnd = valueStart;
+  while (valueEnd < content.size() && std::isdigit(content[valueEnd])) {
+    ++valueEnd;
+  }
+
+  if (valueEnd == valueStart) return 0;
+
+  int phase = std::stoi(content.substr(valueStart, valueEnd - valueStart));
+  return (phase < 0) ? 0 : phase;
+}
+
+bool extractCritical(const std::string& content) {
+  size_t pos = content.find("## Critical:");
+  if (pos == std::string::npos) return false;
+
+  size_t colonPos = content.find(':', pos);
+  if (colonPos == std::string::npos) return false;
+
+  size_t valueStart = colonPos + 1;
+  while (valueStart < content.size() && std::isspace(content[valueStart])) {
+    ++valueStart;
+  }
+
+  size_t valueEnd = valueStart;
+  while (valueEnd < content.size() && !std::isspace(content[valueEnd]) &&
+         content[valueEnd] != '\n' && content[valueEnd] != '\r') {
+    ++valueEnd;
+  }
+
+  std::string value = content.substr(valueStart, valueEnd - valueStart);
+  std::string lower;
+  lower.reserve(value.size());
+  for (char c : value) {
+    lower += static_cast<char>(std::tolower(c));
+  }
+  return (lower == "true");
+}
+
+std::vector<std::string> extractSectionListItems(
+    const std::string& content, const std::string& sectionHeader) {
+  std::vector<std::string> result;
+
+  size_t sectionPos = content.find(sectionHeader);
+  if (sectionPos == std::string::npos) return result;
+
+  size_t contentStart = content.find('\n', sectionPos);
+  if (contentStart == std::string::npos) return result;
+  ++contentStart;
+
+  size_t sectionEnd = content.find("\n## ", contentStart);
+  if (sectionEnd == std::string::npos) {
+    sectionEnd = content.size();
+  }
+
+  std::string section = content.substr(contentStart, sectionEnd - contentStart);
+
+  size_t lineStart = 0;
+  while (lineStart < section.size()) {
+    size_t lineEnd = section.find('\n', lineStart);
+    if (lineEnd == std::string::npos) lineEnd = section.size();
+
+    std::string line = section.substr(lineStart, lineEnd - lineStart);
+
+    size_t tickStart = line.find('`');
+    if (tickStart != std::string::npos) {
+      size_t tickEnd = line.find('`', tickStart + 1);
+      if (tickEnd != std::string::npos) {
+        result.push_back(line.substr(tickStart + 1, tickEnd - tickStart - 1));
+      }
+    }
+
+    lineStart = lineEnd + 1;
+  }
+
+  return result;
+}
+
 } // namespace taskpad

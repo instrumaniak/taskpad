@@ -19,8 +19,6 @@ struct Task {
   std::vector<std::string> depends;
   int phase = 0;
   bool critical = false;
-  std::vector<std::string> files;
-  std::vector<std::string> specs;
 };
 
 struct ProjectConfig {

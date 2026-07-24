@@ -48,8 +48,6 @@ struct Commands {
       const std::string& phase,
       bool criticalSet,
       bool criticalVal,
-      const std::vector<std::string>& files,
-      const std::vector<std::string>& specs,
       const std::string& phases,
       const std::string& criticalPath);
 

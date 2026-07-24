@@ -25,8 +25,6 @@ TEST_CASE("Task struct default values") {
   CHECK(t.depends.empty());
   CHECK(t.phase == 0);
   CHECK(t.critical == false);
-  CHECK(t.files.empty());
-  CHECK(t.specs.empty());
 }
 
 TEST_CASE("Task struct with values") {
@@ -37,8 +35,6 @@ TEST_CASE("Task struct with values") {
   t.depends = {"T002"};
   t.phase = 2;
   t.critical = true;
-  t.files = {"src/test.cpp"};
-  t.specs = {"spec.md"};
 
   CHECK(t.id == "T001");
   CHECK(t.name == "Test Task");
@@ -47,10 +43,6 @@ TEST_CASE("Task struct with values") {
   CHECK(t.depends[0] == "T002");
   CHECK(t.phase == 2);
   CHECK(t.critical == true);
-  CHECK(t.files.size() == 1);
-  CHECK(t.files[0] == "src/test.cpp");
-  CHECK(t.specs.size() == 1);
-  CHECK(t.specs[0] == "spec.md");
 }
 
 TEST_CASE("Result success") {

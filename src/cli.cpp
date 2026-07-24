@@ -168,12 +168,6 @@ int runCLI(int argc, char** argv) {
   bool editNoCritical = false;
   editCmd->add_flag("--critical", editCritical, "Mark as critical");
   editCmd->add_flag("--no-critical", editNoCritical, "Unmark critical");
-  std::string editFiles;
-  editCmd->add_option("--files", editFiles,
-      "Set files (comma-separated)");
-  std::string editSpecs;
-  editCmd->add_option("--specs", editSpecs,
-      "Set spec references (comma-separated)");
   std::string editPhases;
   editCmd->add_option("--phases", editPhases,
       "Set phase mapping (e.g. '0:Scaffolding,1:Foundation')");
@@ -181,26 +175,14 @@ int runCLI(int argc, char** argv) {
   editCmd->add_option("--critical-path", editCriticalPath,
       "Set critical path (comma-separated task IDs)");
   editCmd->callback([&]() {
-    std::vector<std::string> deps, files, specs;
-    auto splitClean = [](const std::string& s) {
-      if (s.empty()) return std::vector<std::string>();
-      std::vector<std::string> parts = split(s, ',');
-      std::vector<std::string> clean;
-for (const std::string& p : parts) {
-        if (!p.empty()) clean.push_back(p);
-      }
-      return clean;
-    };
-    deps = editDepends;
-    if (!editFiles.empty()) files = splitClean(editFiles);
-    if (!editSpecs.empty()) specs = splitClean(editSpecs);
+    std::vector<std::string> deps = editDepends;
 
     bool critSet = editCritical || editNoCritical;
     bool critVal = editCritical;
 
     Result<void> r = Commands::edit(tasksDir, editId,
         editStatus, deps, editPhase, critSet, critVal,
-        files, specs, editPhases, editCriticalPath);
+        editPhases, editCriticalPath);
     if (r.hasError()) {
       std::cerr << "error: " << r.errorMessage() << std::endl;
       exitCode = 1;

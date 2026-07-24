@@ -22,8 +22,6 @@ function taskDefaults(id) {
     depends: [],
     phase: 0,
     critical: false,
-    files: [],
-    specs: [],
   };
 }
 
@@ -35,6 +33,48 @@ function taskFilename(id, name) {
   return `${id}-${toKebab(name)}.md`;
 }
 
+function mdImportContent(id, name, { phase, critical, depends, status } = {}) {
+  const depLine = depends && depends.length > 0 ? depends.join(', ') : '(None)';
+  const lines = [
+    `# ${id}: ${name}`,
+    '',
+    '## Goal',
+    '',
+    'Test task.',
+    '',
+    '## Depends On',
+    '',
+    depLine,
+    '',
+    '## Spec References',
+    '',
+    '- `specs/spec1.md`',
+    '',
+    '## Files to Create/Modify',
+    '',
+    `- \`src/${toKebab(name)}.cpp\``,
+    '',
+    '## Implementation Steps',
+    '',
+    '1. Implement the task',
+    '',
+    '## Acceptance Criteria',
+    '',
+    '- [ ] Task complete',
+    '',
+  ];
+  if (phase !== undefined) {
+    lines.splice(3, 0, '', `## Phase: ${phase}`);
+  }
+  if (critical !== undefined) {
+    lines.splice(3, 0, '', `## Critical: ${critical}`);
+  }
+  if (status !== undefined) {
+    lines.splice(3, 0, '', `## Status: ${status}`);
+  }
+  return lines.join('\n');
+}
+
 function generateYaml(tasks) {
   let yaml = '# taskpad status file\n\ntasks:\n';
   for (const t of tasks) {
@@ -44,8 +84,6 @@ function generateYaml(tasks) {
     yaml += `    depends: [${t.depends.join(', ')}]\n`;
     yaml += `    phase: ${t.phase}\n`;
     yaml += `    critical: ${t.critical}\n`;
-    yaml += `    files: []\n`;
-    yaml += `    specs: []\n`;
   }
   return yaml;
 }
@@ -74,7 +112,7 @@ function mdContent(id, name, depends) {
   ].join('\n');
 }
 
-export function createProject({ tasks = [], empty = false, statusYaml } = {}) {
+export function createProject({ tasks = [], empty = false, statusYaml, importTasks: importTasksOpt } = {}) {
   ensureBuilt();
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'taskpad-test-'));
@@ -92,6 +130,21 @@ export function createProject({ tasks = [], empty = false, statusYaml } = {}) {
 
     if (statusYaml) {
       fs.writeFileSync(path.join(td, 'status.yaml'), statusYaml);
+    } else if (importTasksOpt) {
+      for (const t of importTasksOpt) {
+        const defaults = taskDefaults(t.id);
+        const name = t.name || defaults.name;
+        const fname = taskFilename(t.id, name);
+        fs.writeFileSync(
+          path.join(td, fname),
+          mdImportContent(t.id, name, {
+            phase: t.phase,
+            critical: t.critical,
+            depends: t.depends,
+            status: t.status,
+          })
+        );
+      }
     } else if (tasks.length > 0) {
       const resolved = tasks.map(t =>
         typeof t === 'string' ? taskDefaults(t) : { ...taskDefaults(t.id), ...t }

@@ -68,3 +68,82 @@ TEST_CASE("normalizePath") {
   CHECK(normalizePath("specs/tasks") == "specs/tasks");
   CHECK(normalizePath("/") == "/");
 }
+
+TEST_CASE("extractPhase") {
+  CHECK(extractPhase("## Phase: 3") == 3);
+  CHECK(extractPhase("## Phase: 0") == 0);
+  CHECK(extractPhase("## Phase: 42") == 42);
+  CHECK(extractPhase("no phase header here") == 0);
+  CHECK(extractPhase("") == 0);
+  CHECK(extractPhase("## Phase: -1") == 0);
+  CHECK(extractPhase("## Phase: abc") == 0);
+  CHECK(extractPhase("## Phase: 7\n## Goal: stuff") == 7);
+  CHECK(extractPhase("## Phase:") == 0);
+}
+
+TEST_CASE("extractCritical") {
+  CHECK(extractCritical("## Critical: true") == true);
+  CHECK(extractCritical("## Critical: TRUE") == true);
+  CHECK(extractCritical("## Critical: True") == true);
+  CHECK(extractCritical("## Critical: tRuE") == true);
+  CHECK(extractCritical("## Critical: false") == false);
+  CHECK(extractCritical("## Critical: FALSE") == false);
+  CHECK(extractCritical("no critical header") == false);
+  CHECK(extractCritical("") == false);
+  CHECK(extractCritical("## Critical: garbage") == false);
+  CHECK(extractCritical("## Critical: maybe") == false);
+  CHECK(extractCritical("## Critical: true\n## Goal: stuff") == true);
+}
+
+TEST_CASE("extractSectionListItems") {
+  std::string content =
+    "# T001: Test\n"
+    "## Spec References\n"
+    "- `spec1.md`\n"
+    "- `path/to/spec2.md`\n"
+    "## Files to Create/Modify\n"
+    "- `src/file1.cpp`\n"
+    "- `include/file2.h`\n";
+
+  // Extract from Spec References
+  std::vector<std::string> specs = extractSectionListItems(
+      content, "## Spec References");
+  CHECK(specs.size() == 2);
+  CHECK(specs[0] == "spec1.md");
+  CHECK(specs[1] == "path/to/spec2.md");
+
+  // Extract from Files to Create/Modify
+  std::vector<std::string> files = extractSectionListItems(
+      content, "## Files to Create/Modify");
+  CHECK(files.size() == 2);
+  CHECK(files[0] == "src/file1.cpp");
+  CHECK(files[1] == "include/file2.h");
+
+  // Missing section
+  std::vector<std::string> missing = extractSectionListItems(
+      content, "## Nonexistent Section");
+  CHECK(missing.empty());
+
+  // Empty content
+  std::vector<std::string> empty = extractSectionListItems(
+      "", "## Spec References");
+  CHECK(empty.empty());
+
+  // No backtick items
+  std::vector<std::string> noTicks = extractSectionListItems(
+      "## Spec References\n- plain text\n- more text\n",
+      "## Spec References");
+  CHECK(noTicks.empty());
+
+  // Mixed content
+  std::string mixed =
+    "## Files\n"
+    "- `main.cpp` (MODIFY)\n"
+    "- Makefile\n"
+    "- `utils.h`\n";
+  std::vector<std::string> mixedResult = extractSectionListItems(
+      mixed, "## Files");
+  CHECK(mixedResult.size() == 2);
+  CHECK(mixedResult[0] == "main.cpp");
+  CHECK(mixedResult[1] == "utils.h");
+}

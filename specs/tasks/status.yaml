@@ -1,7 +1,7 @@
 tasks:
   T001:
     name: Enhance Import To Extract Phase Specs And Files
-    status: pending
+    status: done
     depends: ~
     phase: 0
     critical: false
@@ -32,3 +32,7 @@ tasks:
     critical: false
     files: ~
     specs: ~
+phases:
+  0: Taskpad Core
+critical_path:
+  - T003

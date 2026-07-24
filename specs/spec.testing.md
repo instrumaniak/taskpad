@@ -30,7 +30,7 @@ doctest (header-only, system package `doctest-dev`):
 |------|----------|
 | `test_models.cpp` | Task struct, Status enum, ProjectConfig |
 | `test_storage.cpp` | YAML read/write, file I/O |
-| `test_utils.cpp` | String helpers (toKebabCase, parseTaskId, formatTaskId, normalizePath) |
+| `test_utils.cpp` | String helpers (toKebabCase, parseTaskId, formatTaskId, normalizePath, extractPhase, extractCritical, extractSectionListItems) |
 | `test_validator.cpp` | Input validation, edge cases |
 
 ### Test Examples
@@ -157,6 +157,7 @@ One file per command under `tests/e2e/`:
 
 | File | Tests |
 |------|-------|
+| `import.mjs` | Creates status.yaml from existing T*.md files; --force overwrites; parses phase/critical/status/depends; missing sections default; circular dependency error; "no files" message |
 | `init.mjs` | Creates `.taskpad` config; fails if already initialized; custom task-dir |
 | `new.mjs` | Creates T*.md + status.yaml entry; auto-increments IDs; --depends/--phase/--critical flags; circular dependency rejection; duplicate name warning; empty name error |
 | `remove.mjs` | Removes from status.yaml only (with confirmation); --force skips prompt; --all deletes .md; --all --force both; dependent warning |
@@ -167,7 +168,7 @@ One file per command under `tests/e2e/`:
 | `pause.mjs` | Reverts in_progress → pending; already_pending error |
 | `deps.mjs` | Shows depends and dependents; (none) for empty lists; ✓/✗ markers |
 | `log.mjs` | Appends timestamped entry to Notes section; creates Notes if missing; empty message error |
-| `edit.mjs` | --status/--phase/--critical/--depends/--files/--specs task flags; --phases/--critical-path project flags; validation errors |
+| `edit.mjs` | --status/--phase/--critical/--depends task flags; --phases/--critical-path project flags; validation errors |
 | `summary.mjs` | Shows totals, percentages, per-phase breakdown, critical path |
 | `install-skills.mjs` | Global install to ~/.agents/skills/; --project install; --force overwrite; "already installed" error |
 
@@ -203,6 +204,10 @@ Every error case from `spec.main.md` §6 Edge Cases must have a corresponding E2
 | Duplicate task name | `run('new', 'Test'); run('new', 'Test')` | new |
 | Already initialized | init twice | init |
 | status.yaml already exists (import) | init + new, then import | import |
+| Circular dependency (import) | T*.md with T002→T003→T002 cycle, then `import` | import |
+| Dependency not found (import) | T*.md with depends on nonexistent T999, then `import` | import |
+| Phase extraction | T*.md with `## Phase: 3`, then check status.yaml for phase=3 | import |
+| Critical extraction | T*.md with `## Critical: true`, then check status.yaml for critical=true | import |
 | Invalid task-dir path | set task-dir to nonexistent path, then status | all commands |
 
 ### Example E2E Test

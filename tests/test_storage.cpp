@@ -82,8 +82,6 @@ TEST_CASE("readStatusFile and writeStatusFile roundtrip") {
   t2.depends = {"T001"};
   t2.phase = 1;
   t2.critical = true;
-  t2.files = {"src/test.cpp"};
-  t2.specs = {"spec.md"};
 
   sf.tasks["T001"] = t1;
   sf.tasks["T002"] = t2;
@@ -115,10 +113,6 @@ TEST_CASE("readStatusFile and writeStatusFile roundtrip") {
   CHECK(loaded.tasks["T002"].depends[0] == "T001");
   CHECK(loaded.tasks["T002"].phase == 1);
   CHECK(loaded.tasks["T002"].critical == true);
-  CHECK(loaded.tasks["T002"].files.size() == 1);
-  CHECK(loaded.tasks["T002"].files[0] == "src/test.cpp");
-  CHECK(loaded.tasks["T002"].specs.size() == 1);
-  CHECK(loaded.tasks["T002"].specs[0] == "spec.md");
 
   // Verify config
   CHECK(loaded.config.phases.size() == 2);
