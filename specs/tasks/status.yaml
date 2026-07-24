@@ -5,33 +5,25 @@ tasks:
     depends: ~
     phase: 0
     critical: false
-    files: ~
-    specs: ~
   T002:
     name: Prepare Cardgame Repo For Taskpad Management
-    status: pending
+    status: done
     depends:
       - T001
     phase: 0
     critical: false
-    files: ~
-    specs: ~
   T003:
     name: Code Review Fixes For This Session
     status: done
     depends: ~
     phase: 0
     critical: true
-    files: ~
-    specs: ~
   T004:
     name: Fix Remove Cli Flag
     status: done
     depends: ~
     phase: 0
     critical: false
-    files: ~
-    specs: ~
 phases:
   0: Taskpad Core
 critical_path:
