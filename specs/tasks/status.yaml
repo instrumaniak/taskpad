@@ -24,6 +24,12 @@ tasks:
     depends: ~
     phase: 0
     critical: false
+  T005:
+    name: add docs, remove agent-skills
+    status: pending
+    depends: ~
+    phase: 0
+    critical: false
 phases:
   0: Taskpad Core
 critical_path:
