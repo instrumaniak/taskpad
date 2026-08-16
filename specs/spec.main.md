@@ -10,14 +10,14 @@ taskpad is a lightweight, deterministic task management CLI tool designed for AI
 
 - **Single source of truth**: All task metadata lives in one file (`status.yaml`). No duplication across files.
 - **No frontmatter**: Task description files (`T*.md`) are pure Markdown with no YAML/JSON frontmatter.
-- **AI-agent friendly**: Structured output, predictable behavior, no crashes on edge cases.
+- **Human-friendly**: Clear output, predictable behavior, no crashes on edge cases.
 - **Deterministic**: Same inputs always produce same outputs. No randomness, no side effects.
 - **Zero privileges**: Installation requires no root/sudo access.
 - **Minimal config**: `.taskpad` stores only project-level settings (task directory path).
 
 ### Use Cases
 
-- Solo developers using AI agents for code generation
+- Solo developers tracking implementation tasks
 - Small teams tracking implementation tasks
 - Projects with sequential task execution (one task at a time)
 - Any workflow where task status needs to be machine-readable and human-editable
@@ -55,7 +55,7 @@ task-dir: specs/tasks    # Path to task files directory (default: specs/tasks)
 ### How CLI Interacts with Files
 
 ```
-User/AI Agent
+User
     │
     ▼
 ┌─────────────────────┐
@@ -331,7 +331,7 @@ Edit T002-core-types.md to add:
 - Converts name to kebab-case for filename
 - Creates T*.md file from template (no Status line — status is tracked in `status.yaml` only)
 - Adds entry to `status.yaml` with status=pending
-- Optional flags: `--depends <TXXX,TYYY>`, `--phase <N>`, `--critical`
+- Optional flags: `--depends <TXXX>` (repeatable), `--phase <N>`, `--critical`
 - Validates no circular dependencies when `--depends` is provided
 - Task ID is auto-incremented, never reused
 
@@ -496,9 +496,17 @@ Updated T003 status: done
 $ taskpad edit T003 --phase 2
 Updated T003 phase: 2
 
-# Edit task dependencies
-$ taskpad edit T003 --depends T001,T002
+# Edit task dependencies (repeatable flag; space or repeated values)
+$ taskpad edit T003 --depends T001 --depends T002
 Updated T003 depends: T001, T002
+
+# Edit critical flag
+$ taskpad edit T003 --critical
+Updated T003 critical: true
+
+# Unmark critical flag
+$ taskpad edit T003 --no-critical
+Updated T003 critical: false
 
 # Edit project-level phases mapping
 $ taskpad edit --phases "0:Scaffolding,1:Foundation,2:Core"
@@ -510,7 +518,7 @@ Updated critical path
 ```
 
 **Behavior:**
-- For task-level flags (`--status`, `--phase`, `--critical`, `--depends`):
+- For task-level flags (`--status`, `--phase`, `--critical`, `--no-critical`, `--depends`):
   - Validates task ID exists
   - Updates specified fields in `status.yaml`
   - Validates no circular dependencies when `--depends` is modified
@@ -560,44 +568,29 @@ Remove a task.
 
 ```bash
 $ taskpad remove T030
+Are you sure you want to remove T030 from status.yaml? [y/N] y
 Removed T030 — Final Polish
 Updated status.yaml
 
-# With --force to skip file deletion prompt
+# With --all to also delete the task markdown file
+$ taskpad remove T030 --all
+Are you sure you want to remove T030 and delete T030-final-polish.md? [y/N] y
+Removed T030 — Final Polish
+Updated status.yaml
+Deleted T030-final-polish.md
+
+# With --force to skip the confirmation prompt
 $ taskpad remove T030 --force
 Removed T030 — Final Polish
 Updated status.yaml
-(Task file T030-final-polish.md kept)
 ```
 
 **Behavior:**
 - Validates task ID exists
-- Removes entry from `status.yaml`
-- Prompts to also remove T*.md file (use `--force` to skip and keep the file)
 - Warns if other tasks depend on this task
-
-### taskpad install-skills
-
-Install the taskpad AI agent skill file for agent discovery.
-
-```bash
-# Install globally (AI agent searches ~/.agents/skills/)
-$ taskpad install-skills
-Installed skill to ~/.agents/skills/taskpad/SKILL.md
-
-# Install for current project
-$ taskpad install-skills --project
-Installed skill to .agents/skills/taskpad/SKILL.md
-```
-
-**Behavior:**
-- Copies the taskpad skill files (SKILL.md) from the taskpad data directory to the target skill location
-- Global install: `~/.agents/skills/taskpad/` — available to all projects
-- Project install (--project): `.agents/skills/taskpad/` — scoped to current project
-- Skill files are bundled with the taskpad binary during `make install`
-- Reports success with the install path
-- If skill already exists, reports "Already installed. Use --force to overwrite"
-- With `--force`, overwrites existing skill files
+- Prompts for confirmation (`[y/N]`) unless `--force` is given; a non-`y`/`Y` response aborts
+- Removes entry from `status.yaml` (and from the critical path if present)
+- With `--all`, also deletes the task markdown file
 
 ---
 
@@ -605,7 +598,7 @@ Installed skill to .agents/skills/taskpad/SKILL.md
 
 ### Error Format
 
-All errors must return structured output that AI agents can parse:
+All errors must return structured output:
 
 ```
 error: <message>       # Fatal — command cannot proceed
@@ -778,9 +771,7 @@ TEST_SRCS = $(wildcard $(TESTDIR)/test_*.cpp)
 TEST_OBJS = $(patsubst $(TESTDIR)/%.cpp, $(BUILDDIR)/%.o, $(TEST_SRCS))
 TEST_TARGET = $(BUILDDIR)/test_taskpad
 
-TASKPAD_DATA_DIR ?= .agents
-
-.PHONY: all clean install install-bin install-skills-data test e2e-test check debug uninstall
+.PHONY: all clean install install-bin test e2e-test check debug uninstall
 
 all: $(TARGET)
 
@@ -788,7 +779,7 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
-	$(CXX) $(CXXFLAGS) -DTASKPAD_DATA_DIR=\"$(TASKPAD_DATA_DIR)\" -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
@@ -816,20 +807,15 @@ check: test e2e-test
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 
-install: install-bin install-skills-data
+install: install-bin
 
 install-bin: $(TARGET)
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(TARGET) $(DESTDIR)$(PREFIX)/bin/
 
-install-skills-data:
-	install -d $(DESTDIR)$(PREFIX)/share/taskpad/skills
-	cp -r .agents/skills/taskpad $(DESTDIR)$(PREFIX)/share/taskpad/skills/
-
 uninstall:
 	rm -f $(HOME)/.local/bin/$(TARGET)
 	rm -rf $(HOME)/.local/share/taskpad
-	rm -rf $(HOME)/.agents/skills/taskpad
 ```
 
 ### Code Structure
@@ -867,8 +853,7 @@ taskpad/
 │   │   ├── deps.mjs
 │   │   ├── log.mjs
 │   │   ├── edit.mjs
-│   │   ├── summary.mjs
-│   │   └── install-skills.mjs
+│   │   └── summary.mjs
 │   ├── data/                 # Unit test fixtures
 │   │   ├── sample_status.yaml
 │   │   └── sample_tasks/
@@ -996,82 +981,7 @@ Current version: `1.0.0`
 
 ---
 
-## 11. AI Agent Skill System
-
-### Purpose
-
-taskpad ships with an AI agent skill that teaches agents how to use the CLI. The skill replaces any file-based task management approach (e.g., manually reading/writing `## Status:` in Markdown files). All task operations go through the `taskpad` CLI.
-
-### Skill File Location
-
-The skill follows the vendor-neutral agent skill convention, discoverable by OpenCode, Claude Code, and other AI agents:
-
-| Scope | Path |
-|-------|------|
-| Project | `.agents/skills/taskpad/SKILL.md` |
-| Global | `~/.agents/skills/taskpad/SKILL.md` |
-
-### Shipped Files
-
-The taskpad repository contains the skill at `.agents/skills/taskpad/SKILL.md`. These files are bundled with the binary during `make install` and placed at `$(PREFIX)/share/taskpad/skills/`.
-
-### Installation
-
-Use the `taskpad install-skills` command (see [Section 5](#taskpad-install-skills)):
-
-```bash
-taskpad install-skills           # → ~/.agents/skills/taskpad/
-taskpad install-skills --project # → .agents/skills/taskpad/
-```
-
-Or manually copy from the repo:
-
-```bash
-cp -r .agents/skills/taskpad ~/.agents/skills/
-```
-
-### Skill Discovery
-
-AI agents discover skills automatically from these directories. When a user says `/taskpad status` or asks about task progress, the agent's skill system matches the `description` field and loads `SKILL.md`, which instructs the agent to run `taskpad` CLI commands instead of manipulating files directly.
-
-### Skill Contents
-
-The `SKILL.md` file contains:
-
-- **Frontmatter**: name (`taskpad`), description (trigger conditions), license, compatibility
-- **Setup instructions**: `taskpad init`, `import`, configuring phases and critical path
-- **Command reference**: All `/taskpad` commands with expected output and interpretation
-- **Daily workflow**: next → do → done → log cycle
-- **Progress tracking**: status, summary, deps commands
-- **Error recovery**: What to do when commands fail
-- **Notes**: Status is in `status.yaml` only, not in Markdown files
-
-### AI-Assisted Development Workflow
-
-The skill enables this full workflow for AI agents:
-
-```
-# One-time project setup
-/taskpad init
-/taskpad import
-/taskpad edit --phases "..."
-/taskpad edit --critical-path "..."
-
-# Daily development cycle
-/taskpad next         → agent reads the task file and referenced specs
-/taskpad do TXXX      → agent implements the code
-/taskpad log TXXX     → agent records progress
-/taskpad done TXXX    → agent marks complete
-
-# Progress checks
-/taskpad status
-/taskpad summary
-/taskpad deps TXXX
-```
-
----
-
-## Appendix B: Example Workflow
+## Appendix A: Example Workflow
 
 ### Fresh Project (no existing tasks)
 
@@ -1144,57 +1054,7 @@ taskpad done T003
 
 ---
 
-## Appendix C: AI Agent Skill
-
-The AI agent skill file is shipped with taskpad and installed via `taskpad install-skills` (see [Section 11](#11-ai-agent-skill-system)).
-
-### Shipped File
-
-The skill file lives at `.agents/skills/taskpad/SKILL.md` in the taskpad repository and contains:
-
-- **Frontmatter**: name, description, license, compatibility metadata
-- **Setup instructions**: init, import, configure phases/critical path
-- **Command reference**: All `/taskpad` commands with output examples and interpretation
-- **Daily workflow**: next → do → done → log cycle
-- **Progress tracking**: status, summary, deps
-- **Error recovery table**: What to do for every error case
-
-### Command Prefix
-
-All skill commands use the `/taskpad` prefix to avoid confusion with other tools:
-
-```
-/taskpad status       → taskpad status
-/taskpad next         → taskpad next
-/taskpad do TXXX      → taskpad do TXXX
-/taskpad done TXXX    → taskpad done TXXX
-/taskpad pause TXXX   → taskpad pause TXXX
-/taskpad deps TXXX    → taskpad deps TXXX
-/taskpad new "Name"   → taskpad new "Name"
-/taskpad summary      → taskpad summary
-/taskpad import       → taskpad import
-/taskpad init         → taskpad init
-/taskpad log TXXX ... → taskpad log TXXX ...
-/taskpad edit TXXX ... → taskpad edit TXXX ...
-/taskpad remove TXXX  → taskpad remove TXXX
-/taskpad install-skills → taskpad install-skills
-```
-
-### Install
-
-```bash
-# Global (all projects)
-taskpad install-skills
-
-# Project-specific
-taskpad install-skills --project
-```
-
-See [Section 11](#11-ai-agent-skill-system) for full details on the skill system.
-
----
-
-## Appendix D: File Naming Conventions
+## Appendix B: File Naming Conventions
 
 - Task files: `TXXX-kebab-case-name.md`
   - Examples: `T001-project-setup.md`, `T015-level-config.md`
@@ -1204,7 +1064,7 @@ See [Section 11](#11-ai-agent-skill-system) for full details on the skill system
 
 ---
 
-## Appendix E: YAML Schema Validation
+## Appendix C: YAML Schema Validation
 
 ### .taskpad Config Schema
 

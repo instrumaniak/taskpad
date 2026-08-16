@@ -151,25 +151,6 @@ static bool fileExists(const std::string& path) {
   return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
 }
 
-static bool copyFile(const std::string& src, const std::string& dst) {
-  std::ifstream in(src, std::ios::binary);
-  if (!in) return false;
-
-  // Create directories if needed
-  size_t pos = dst.rfind('/');
-  if (pos != std::string::npos) {
-    std::string dir = dst.substr(0, pos);
-    std::error_code ec;
-    std::filesystem::create_directories(dir, ec);
-  }
-
-  std::ofstream out(dst, std::ios::binary);
-  if (!out) return false;
-
-  out << in.rdbuf();
-  return out.good();
-}
-
 static int countStatus(const std::map<std::string, Task>& tasks,
     Status s) {
   int count = 0;
@@ -1202,47 +1183,6 @@ Result<void> Commands::remove(const std::string& tasksDir,
     }
   }
 
-  return Result<void>::success();
-}
-
-Result<void> Commands::installSkills(bool project) {
-  // Find source directory
-  std::string sourceDir;
-  std::string installedPath =
-      std::string(TASKPAD_DATA_DIR) + "/share/taskpad/skills/taskpad";
-  std::string devPath = ".agents/skills/taskpad";
-
-  if (fileExists(installedPath + "/SKILL.md")) {
-    sourceDir = installedPath;
-  } else if (fileExists(devPath + "/SKILL.md")) {
-    sourceDir = devPath;
-  } else {
-    return Result<void>::failure("Skill files not found");
-  }
-
-  std::string targetDir;
-  if (project) {
-    targetDir = ".agents/skills/taskpad";
-  } else {
-    const char* home = std::getenv("HOME");
-    if (!home) {
-      return Result<void>::failure("HOME environment variable not set");
-    }
-    targetDir = std::string(home) + "/.agents/skills/taskpad";
-  }
-
-  std::string targetFile = targetDir + "/SKILL.md";
-
-  if (fileExists(targetFile)) {
-    return Result<void>::failure(
-        "Already installed. Use --force to overwrite");
-  }
-
-  if (!copyFile(sourceDir + "/SKILL.md", targetFile)) {
-    return Result<void>::failure("Failed to install skill to " + targetDir);
-  }
-
-  std::cout << "Installed skill to " << targetDir << "/" << std::endl;
   return Result<void>::success();
 }
 

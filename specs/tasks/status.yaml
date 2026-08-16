@@ -26,7 +26,7 @@ tasks:
     critical: false
   T005:
     name: add docs, remove agent-skills
-    status: pending
+    status: done
     depends: ~
     phase: 0
     critical: false

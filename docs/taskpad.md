@@ -1,14 +1,4 @@
----
-name: taskpad
-description: Manage implementation tasks using the taskpad CLI. Use when the user says /taskpad, wants to check task status, start/pause/complete a task, see what to work on next, create new tasks, check dependencies, or view progress summary. Also use when the user asks about task queues, blocked tasks, or what needs to be done next.
-license: MIT
-compatibility: Requires taskpad CLI installed in PATH
-metadata:
-  source: https://github.com/instrumaniak/taskpad
-  workflow: task-management
----
-
-# Taskpad Skill
+# taskpad — User Guide
 
 Manage the implementation task queue using the `taskpad` CLI. All task metadata lives in `status.yaml` — never edit task status in Markdown files directly.
 
@@ -30,11 +20,11 @@ taskpad edit --critical-path "T001,T003,T010,T011,T012,T016,T024"
 
 ## Command Reference
 
-All commands use the `/taskpad` prefix:
+All commands start with the `taskpad` prefix:
 
 **Global flag:** `--tasks-dir <path>` overrides the task directory from `.taskpad` config. Resolution order: (1) `--tasks-dir` flag, (2) `.taskpad` config's `task-dir` key, (3) fallback `specs/tasks/`.
 
-### `/taskpad status`
+### taskpad status
 Show all tasks grouped by phase with status.
 
 ```
@@ -53,7 +43,7 @@ Progress: 1/30 done, 1 in_progress, 28 pending
 
 The `← next` marker shows the recommended next task. `← blocked by TXXX` shows what's blocking it.
 
-### `/taskpad next`
+### taskpad next
 Show the single next task to work on.
 
 ```
@@ -69,7 +59,7 @@ Next: T003 — Core Types
 Prioritization order: critical path → phase number → task number.
 If output says "All tasks blocked or complete", no tasks are available.
 
-### `/taskpad do TXXX`
+### taskpad do TXXX
 Start working on a task.
 
 ```
@@ -84,7 +74,7 @@ Now reading T003-core-types.md...
 - If already in_progress, reports "Already in_progress"
 - If already done, reports "Already done"
 
-### `/taskpad done TXXX`
+### taskpad done TXXX
 Mark a task as complete.
 
 ```
@@ -97,7 +87,7 @@ Unblocked tasks:
 
 Shows newly unblocked tasks whose dependencies are now all satisfied.
 
-### `/taskpad pause TXXX`
+### taskpad pause TXXX
 Pause a task (revert to pending).
 
 ```
@@ -106,7 +96,7 @@ Paused T003 — Core Types
 Status changed: in_progress → pending
 ```
 
-### `/taskpad deps TXXX`
+### taskpad deps TXXX
 Show dependency information.
 
 ```
@@ -121,7 +111,7 @@ Tasks waiting on T012:
 
 ✓ = dependency satisfied, ✗ = not satisfied.
 
-### `/taskpad new "Task Name"`
+### taskpad new "Task Name"
 Create a new task.
 
 ```
@@ -130,10 +120,10 @@ Created T001-project-setup.md
 Updated status.yaml
 ```
 
-Optional flags: `--depends T001,T002`, `--phase 1`, `--critical`.
+Optional flags: `--depends T001 --depends T002`, `--phase 1`, `--critical`.
 The task file is created from template with no Status line (status is tracked in `status.yaml`).
 
-### `/taskpad summary`
+### taskpad summary
 Show overall progress statistics.
 
 ```
@@ -152,7 +142,7 @@ Critical Path: T001 → T003 → T010 → T011 → T012 → T016 → T024
   Status: 3/7 done, 1 in_progress, 3 pending
 ```
 
-### `/taskpad log TXXX "message"`
+### taskpad log TXXX "message"
 Append a timestamped note to the task file.
 
 ```
@@ -162,33 +152,36 @@ Logged to T003-core-types.md
 
 Format: `- [YYYY-MM-DD HH:MM] message`. Creates `## Notes` section if it doesn't exist.
 
-### `/taskpad edit TXXX --<field> <value>`
+### taskpad edit TXXX --<field> <value>
 Edit task or project metadata.
 
 ```
+> taskpad edit T003 --status done
 > taskpad edit T003 --phase 2
-> taskpad edit T003 --depends T001,T002
-> taskpad edit T003 --files "src/foo.cpp,include/foo.h"
-> taskpad edit T003 --specs "specs/ARCH.md,specs/API.md"
+> taskpad edit T003 --depends T001 --depends T002
+> taskpad edit T003 --critical
+> taskpad edit T003 --no-critical
 > taskpad edit --phases "0:Scaffolding,1:Foundation"
 > taskpad edit --critical-path "T001,T003,T010"
 ```
 
-Task flags: `--status`, `--phase`, `--critical`, `--depends`, `--files`, `--specs`.
+Task flags: `--status`, `--phase`, `--critical`, `--no-critical`, `--depends` (repeatable).
 Project flags (no task ID): `--phases`, `--critical-path`.
 
-### `/taskpad remove TXXX`
+### taskpad remove TXXX
 Remove a task.
 
 ```
 > taskpad remove T030
+Are you sure you want to remove T030 from status.yaml? [y/N] y
 Removed T030 — Final Polish
 Updated status.yaml
 ```
 
-Without `--force`, prints a hint about also removing the .md file. Use `--force` to suppress the hint (does not delete the file).
+- Prompts for confirmation unless `--force` is given
+- `--all` also deletes the task markdown file
 
-### `/taskpad import`
+### taskpad import
 Import existing T*.md files into taskpad.
 
 ```
@@ -199,14 +192,6 @@ Created status.yaml with 30 tasks
 ```
 
 Use `--force` to overwrite an existing `status.yaml`.
-
-### `/taskpad install-skills`
-Install this skill file for AI agent discovery.
-
-```
-> taskpad install-skills            # → ~/.agents/skills/taskpad/
-> taskpad install-skills --project  # → .agents/skills/taskpad/
-```
 
 ## Daily Workflow
 
@@ -238,12 +223,10 @@ Install this skill file for AI agent discovery.
 | `status.yaml already exists` | Use `taskpad import --force` |
 | `Invalid task ID` | Use format TXXX (T001, T002, etc.) |
 | `tasks-dir not found` | Check `.taskpad` config or use `--tasks-dir <path>` |
-| `Skill files not found` | Ensure SKILL.md exists at `.agents/skills/taskpad/` or the install path |
 
 ## Notes
 
 - Task status is stored ONLY in `status.yaml`, never in the Markdown files
 - The `status.yaml` file is the single source of truth — do not edit it manually unless necessary
 - Task files (T*.md) contain goal, steps, acceptance criteria — edit these freely
-- This skill replaces any previous file-based task management approach
 - The `taskpad` CLI must be installed and available in PATH

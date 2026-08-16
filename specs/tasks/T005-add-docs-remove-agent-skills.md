@@ -64,12 +64,20 @@ Modify:
 
 ## Acceptance Criteria
 
-- [ ] `docs/taskpad.md` exists as a human usage guide (setup, command reference including `import`, workflow, error recovery); no YAML frontmatter, no `/taskpad` prefixes, no `install-skills` section, no "Skill files not found" error recovery row, no agent/skill language
-- [ ] `.agents/` directory removed; no `SKILL.md` remains in repo
-- [ ] `taskpad install-skills` fully removed: zero references in `src/`, `Makefile` (including `.PHONY`), `specs/`, `README.md`, and tests
-- [ ] `make` compiles clean and `make check` passes (unit + E2E)
-- [ ] `specs/spec.main.md` and `specs/spec.testing.md` contain no skill/agent sections, no stale file-tree entries, Makefile block has no skill targets
+- [x] `docs/taskpad.md` exists as a human usage guide (setup, command reference including `import`, workflow, error recovery); no YAML frontmatter, no `/taskpad` prefixes, no `install-skills` section, no "Skill files not found" error recovery row, no agent/skill language
+- [x] `.agents/` directory removed; no `SKILL.md` remains in repo
+- [x] `taskpad install-skills` fully removed: zero references in `src/`, `Makefile` (including `.PHONY`), `specs/`, `README.md`, and tests
+- [x] `make` compiles clean and `make check` passes (unit + E2E)
+- [x] `specs/spec.main.md` and `specs/spec.testing.md` contain no skill/agent sections, no stale skill-related file-tree entries, Makefile block has no skill targets
+- [x] `docs/taskpad.md` and `specs/spec.main.md` are consistent with the actual CLI implementation: all documented flags and command behaviors match `./taskpad --help`, `src/cli.cpp`, and `src/commands.cpp` (verified via empirical testing)
 
 ## Notes
 
-(filled in during/after implementation)
+- Moved `.agents/skills/taskpad/SKILL.md` → `docs/taskpad.md`; stripped YAML frontmatter and agent/skill language; removed `install-skills` section and "Skill files not found" error row; removed `/taskpad` prefixes. Deleted `.agents/`. Removed `install-skills` from `src/cli.cpp`, `src/commands.cpp`, `src/commands.h`, `Makefile` (incl. `TASKPAD_DATA_DIR`), `specs/spec.main.md`, `specs/spec.testing.md`; added README link. `make && make check` green.
+- Follow-up doc/spec consistency pass (verified against `./taskpad --help`, `src/cli.cpp`, `src/commands.cpp`, and spec.main.md):
+  - `docs/taskpad.md`: removed bogus `edit --files` / `edit --specs` examples (not in spec, not implemented); added `edit --status` and `edit --no-critical` (implemented and spec'd but previously undocumented).
+  - `docs/taskpad.md` + `specs/spec.main.md` `remove`: rewrote to match implementation — `--force` skips the confirmation prompt, `--all` also deletes the task markdown file (previous text said `--force` skips file deletion). Spec now shows exact prompt/output (`Are you sure you want to remove TXXX from status.yaml? [y/N]`).
+  - `docs/taskpad.md` + `specs/spec.main.md` `new`/`edit` `--depends`: flag is repeatable (`--depends T001 --depends T002`); comma form (`--depends T001,T002`) fails validation — examples corrected.
+  - `specs/spec.testing.md`: `edit.mjs` E2E row now lists `--no-critical`.
+  - Renumbered appendices in `specs/spec.main.md` to close gaps left by Appendix C removal: B→A (Example Workflow), D→B (File Naming Conventions), E→C (YAML Schema Validation). Sequence is now A, B, C.
+  - `make && make check` re-run: 31 unit tests + 29 E2E tests all pass.

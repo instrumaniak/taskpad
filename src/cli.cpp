@@ -218,20 +218,6 @@ int runCLI(int argc, char** argv) {
     }
   });
 
-  // ---- install-skills ----
-  CLI::App* installSkillsCmd = app.add_subcommand("install-skills",
-      "Install the taskpad AI agent skill file");
-  bool installProject = false;
-  installSkillsCmd->add_flag("--project", installProject,
-      "Install for current project only");
-  installSkillsCmd->callback([&]() {
-    Result<void> r = Commands::installSkills(installProject);
-    if (r.hasError()) {
-      std::cerr << "error: " << r.errorMessage() << std::endl;
-      exitCode = 1;
-    }
-  });
-
   try {
     app.parse(argc, argv);
   } catch (const CLI::ParseError& e) {

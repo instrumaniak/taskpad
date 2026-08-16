@@ -18,10 +18,7 @@ TEST_SRCS = $(wildcard $(TESTDIR)/test_*.cpp)
 TEST_OBJS = $(patsubst $(TESTDIR)/%.cpp, $(BUILDDIR)/%.o, $(TEST_SRCS))
 TEST_TARGET = $(BUILDDIR)/test_taskpad
 
-# Skill data directory (for install-skills command)
-TASKPAD_DATA_DIR ?= .agents
-
-.PHONY: all clean install install-bin install-skills-data test e2e-test check debug uninstall
+.PHONY: all clean install install-bin test e2e-test check debug uninstall
 
 all: $(TARGET)
 
@@ -29,7 +26,7 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
-	$(CXX) $(CXXFLAGS) -DTASKPAD_DATA_DIR=\"$(TASKPAD_DATA_DIR)\" -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
@@ -57,17 +54,12 @@ check: test e2e-test
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 
-install: install-bin install-skills-data
+install: install-bin
 
 install-bin: $(TARGET)
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(TARGET) $(DESTDIR)$(PREFIX)/bin/
 
-install-skills-data:
-	install -d $(DESTDIR)$(PREFIX)/share/taskpad/skills
-	cp -r .agents/skills/taskpad $(DESTDIR)$(PREFIX)/share/taskpad/skills/
-
 uninstall:
 	rm -f $(HOME)/.local/bin/$(TARGET)
 	rm -rf $(HOME)/.local/share/taskpad
-	rm -rf $(HOME)/.agents/skills/taskpad

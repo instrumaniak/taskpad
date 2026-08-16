@@ -168,9 +168,8 @@ One file per command under `tests/e2e/`:
 | `pause.mjs` | Reverts in_progress → pending; already_pending error |
 | `deps.mjs` | Shows depends and dependents; (none) for empty lists; ✓/✗ markers |
 | `log.mjs` | Appends timestamped entry to Notes section; creates Notes if missing; empty message error |
-| `edit.mjs` | --status/--phase/--critical/--depends task flags; --phases/--critical-path project flags; validation errors |
+| `edit.mjs` | --status/--phase/--critical/--no-critical/--depends task flags; --phases/--critical-path project flags; validation errors |
 | `summary.mjs` | Shows totals, percentages, per-phase breakdown, critical path |
-| `install-skills.mjs` | Global install to ~/.agents/skills/; --project install; --force overwrite; "already installed" error |
 
 ### Coverage Requirements
 

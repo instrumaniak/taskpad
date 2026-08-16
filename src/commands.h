@@ -57,8 +57,6 @@ struct Commands {
       const std::string& taskId,
       bool removeAll,
       bool force);
-
-  static Result<void> installSkills(bool project);
 };
 
 } // namespace taskpad
